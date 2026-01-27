@@ -41,7 +41,10 @@ class End2EndSystem(Model): # Inherits from Keras Model
         Entradas:
           k: Quantidade de bits de entrada
           n: Quantidade de bits de saída
+          tx: Camada do transmissor (baseada em symbol-wise ou bit-wise).
+          rx: Camada do receptor (baseada em symbol-wise ou bit-wise).
           training: True se o modelo for treinável, Falso caso não.
+          bit_wise: True se o modelo for bit-wise, False caso seja symbol-wise.
         """
 
         super().__init__() # Must call the Keras model initializer
@@ -58,7 +61,7 @@ class End2EndSystem(Model): # Inherits from Keras Model
         if bit_wise:
           self.bce = self.bce = tf.keras.losses.BinaryCrossentropy(from_logits=False)
         else:
-          self.bce = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=False) # Loss function
+          self.bce = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=False)
 
         self.training = training
         self.bit_wise = bit_wise
@@ -88,41 +91,18 @@ class End2EndSystem(Model): # Inherits from Keras Model
         """
         num_symbols = 2**self.k
 
-        # 1. Crie um tensor com os valores decimais dos símbolos (0 a 2^k_bits - 1)
-        # Ex: para k_bits=4, symbols_indices = [0, 1, 2, ..., 15]
-        symbols_indices = tf.range(num_symbols, dtype=tf.int32) # Shape: [num_symbols]
+        symbols_indices = tf.range(num_symbols, dtype=tf.int32)
 
-        # 2. Expanda symbols_indices para ter uma dimensão extra para os bits
-        #    e crie um tensor de potências de 2 para extração de bits.
-        # Ex: para k_bits=4, powers_of_2 = [8, 4, 2, 1]
-        #    Ou, mais flexível, crie uma máscara para cada bit
-        #    masks = [[8], [4], [2], [1]]
         powers_of_2 = tf.pow(2, tf.range(self.k - 1, -1, -1)) # Shape: [k_bits]
-        # Ex: k_bits=4 -> tf.range(3, -1, -1) = [3, 2, 1, 0] -> powers_of_2 = [8, 4, 2, 1]
 
-        # 3. Construa o bit_map usando operações de tensor (sem loops Python)
-        #    A ideia é verificar se o i-ésimo bit de cada símbolo 'j' é 1.
-        #    symbols_indices_expanded: [num_symbols, 1]
         symbols_indices_expanded = tf.expand_dims(symbols_indices, axis=1)
 
-        #    powers_of_2_expanded: [1, k_bits]
         powers_of_2_expanded = tf.expand_dims(powers_of_2, axis=0)
 
-        #    (symbols_indices_expanded & powers_of_2_expanded): Realiza um AND bit a bit
-        #    Isso resulta em um tensor [num_symbols, k_bits] onde cada elemento
-        #    será powers_of_2[i] se o bit estiver setado, ou 0 se não estiver.
-        #    Ex: (3 & 8) = 0, (3 & 4) = 0, (3 & 2) = 2, (3 & 1) = 1
-        #    Note que a ordem dos bits aqui é MSB primeiro.
         bit_flags = tf.bitwise.bitwise_and(symbols_indices_expanded, powers_of_2_expanded)
 
-        #    Converte para 0s e 1s (se > 0 é 1, se = 0 é 0)
-        #    bit_map: [num_symbols, k_bits]
         bit_map = tf.cast(tf.math.greater(bit_flags, 0), dtype=tf.float32)
 
-        # 4. Realiza a multiplicação da matriz para somar as probabilidades
-        #    symbol_probs: [batch_size, num_symbols]
-        #    bit_map:      [num_symbols, k_bits]
-        #    Resultado:    [batch_size, k_bits]
         bit_probabilities = tf.matmul(symbol_probs, bit_map)
 
         return bit_probabilities
@@ -275,31 +255,33 @@ class End2EndSystem(Model): # Inherits from Keras Model
     def __call__(self, batch_size, ebno_db):
         """
           Realiza uma quantidade 'batch_size' de transmissões pelo canal com um SNR de 'ebno_db', demodula e decodifica
-          usando um receptor baseado em symbol-wise e usa a função binária de entropia cruzada como função de perda.
+          usando um receptor baseado em symbol-wise ou bit-wise e usa a função binária de entropia cruzada como função de perda (esparça para symbol-wise).
         """
 
         bits = self.rng.uniform([batch_size, self.k], 0, 2, tf.int32)
         
-        z = self.transmitter(bits)
+        if self.bit_wise:
+            z = self.transmitter(bits)
+        else:
+            indices = self.bits_to_indices(bits)
+            one_hot = tf.one_hot(indices, depth=self.M)
+            z = self.transmitter(one_hot)
 
         y = self.add_GaussianNoise(z, ebno_db)
         
-        b_hat = self.receiver(y)
+        recev = self.receiver(y)
 
         if self.training:
             if self.bit_wise:
-                loss = self.bce(bits, b_hat)
+                loss = self.bce(bits, recev)
             else:
-                indice = tf.math.argmax(ONE, axis=-1)
-                loss = self.bce(indice, p_hat)
+                indice = tf.math.argmax(one_hot, axis=-1)
+                loss = self.bce(indice, recev)
             return loss
-            #return loss
         else:
-            #return ONE, p
             if self.bit_wise:
-              bits_hat = tf.math.greater_equal(b_hat, 0.5)
+              bits_hat = tf.math.greater_equal(recev, 0.5)
               bits_hat = tf.cast(bits_hat, dtype=tf.int32)
               return bits, bits_hat
             else:
-              return bits, self.indices_to_bits(tf.math.argmax(p_hat, axis=-1))
-            #return ind, ONE, z, x, y, p
+              return bits, self.indices_to_bits(tf.math.argmax(recev, axis=-1))
