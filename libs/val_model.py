@@ -1,3 +1,4 @@
+import libs.tf_config
 import pickle
 import tensorflow as tf
 from IPython import display
