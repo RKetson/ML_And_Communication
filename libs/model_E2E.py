@@ -1,17 +1,9 @@
-import os
-
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-os.environ['XLA_FLAGS'] = '--xla_gpu_cuda_data_dir=/usr/lib/cuda/'
-
-import tensorflow as tf
+import libs.tf_config
 import matplotlib.pyplot as plt
-# Avoid warnings from TensorFlow
-tf.get_logger().setLevel('ERROR')
+import tensorflow as tf
+import numpy as np
 
-from tensorflow.keras import Model
-from tensorflow.keras.layers import Dense, Layer, Convolution1D, Flatten, Reshape, MaxPooling1D
-
-class EnergyNormalization(Layer):
+class EnergyNormalization(tf.keras.Layer):
     """
         Camada personalizada para normalização por energia.
     """
@@ -31,7 +23,7 @@ class EnergyNormalization(Layer):
 
         return x_norm
     
-class End2EndSystem(Model): # Inherits from Keras Model
+class End2EndSystem(tf.keras.Model): # Inherits from Keras Model
     """
       Modelo criado para simular um sistem Fim-a-Fim com camadas treináveis.
     """
