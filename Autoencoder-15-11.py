@@ -40,7 +40,7 @@ train(model_train, SNRdb_train, optimizer, NUM_TRAINING_ITERATIONS, BATCH_SIZE, 
 model = recover_weights(model, local_weights_11_15)
 
 # Avalia o modelo treinado
-ebno_dbs = np.arange(-4, 9, 1)
+ebno_dbs = np.arange(-4, 8, 1)
 
 ber, ser = aval_model(model, ebno_dbs, max_iter=100000, graph_mode="xla", local=local_ber_ser_11_15)
 
