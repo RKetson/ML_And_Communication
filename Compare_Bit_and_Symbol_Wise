@@ -95,6 +95,7 @@ symbol_ber, symbol_ser = aval_model(symbol_model, ebno_dbs, max_iter=100000, gra
 """
 
 ber, ser = txt_to_dict("./Pontos/AFF3CT/Hamming-7-4.txt")
+ber_uncoded, ser_uncoded = txt_to_dict("./Pontos/AFF3CT/Uncoded-BPSK.txt")
 
 plt.figure(figsize=(10, 5))
 
@@ -102,6 +103,7 @@ plt.subplot(1, 2, 1)
 plt.semilogy(ebno_dbs, bit_ber, 'o-', label='Autoencoder (7,4) - Bit-wise')
 plt.semilogy(ebno_dbs, symbol_ber, 's-', label='Autoencoder (7,4) - Symbol-wise')
 plt.semilogy(ebno_dbs, ber, '^-', label='Hamming (7,4) - Soft Decision')
+plt.semilogy(ebno_dbs, ber_uncoded, '--', label='B-PSK - Não codificado')
 plt.xlabel('EB/N0 (dB)')
 plt.ylabel('BER')
 plt.title('Bit Error Rate Comparison')
@@ -112,6 +114,7 @@ plt.subplot(1, 2, 2)
 plt.semilogy(ebno_dbs, bit_ser, 'o-', label='Autoencoder (7,4) - Bit-wise')
 plt.semilogy(ebno_dbs, symbol_ser, 's-', label='Autoencoder (7,4) - Symbol-wise')
 plt.semilogy(ebno_dbs, ser, '^-', label='Hamming (7,4) - Soft Decision')
+plt.semilogy(ebno_dbs, ser_uncoded, '--', label='B-PSK - Não codificado')
 plt.xlabel('EB/N0 (dB)')
 plt.ylabel('SER')
 plt.title('Symbol Error Rate Comparison')
