@@ -86,7 +86,7 @@ def aval_model(model, ebno_dbs, batch_size=127, block_errors=1000, max_iter=1000
     """
     with tf.device('/device:GPU:0'):
         ber, ser = sim_ber(model, ebno_dbs, batch_size=batch_size, num_target_block_errors=block_errors, max_mc_iter=max_iter, graph_mode=graph_mode)
-        return ber.numpy(), ser.numpy()
+        ber, ser = ber.numpy(), ser.numpy()
     
     ber_dict = {ebno: b for ebno, b in zip(ebno_dbs, ber)}
     ser_dict = {ebno: s for ebno, s in zip(ebno_dbs, ser)}

@@ -44,6 +44,7 @@ ebno_dbs = np.arange(-4, 8, 1)
 
 ber, ser = aval_model(model, ebno_dbs, max_iter=100000, graph_mode="xla", local=local_ber_ser_11_15)
 #ber, ser = recover_points_model(local_ber_ser_11_15)
+ber, ser = [ber[ebno] for ebno in ebno_dbs], [ser[ebno] for ebno in ebno_dbs]
 
 # ============================================================================================ #
 """

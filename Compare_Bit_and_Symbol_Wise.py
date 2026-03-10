@@ -53,6 +53,7 @@ bit_model = recover_weights(bit_model, bit_local_weights_4_7)
 # Avalia o modelo treinado
 #bit_ber, bit_ser = aval_model(bit_model, ebno_dbs, max_iter=100000, graph_mode="xla", local=bit_local_ber_ser_4_7)
 bit_ber, bit_ser = recover_points_model(bit_local_ber_ser_4_7)
+bit_ber, bit_ser = [bit_ber[ebno] for ebno in ebno_dbs], [bit_ser[ebno] for ebno in ebno_dbs]
 
 # ============================================================================================ #
 """
@@ -65,7 +66,7 @@ bit_ber, bit_ser = recover_points_model(bit_local_ber_ser_4_7)
 
 # Instancia as camadas do transmissor e receptor
 tx = Net_Conv_v1.transmitter(k, n)
-rx = Net_Conv_v1.receiver(k, n)
+rx = Net_Conv_v1.receiver(k, n, bit_wise=False)
 
 # Instancia o modelo fim-a-fim
 symbol_model_train = End2EndSystem(k, n, tx, rx, training=True, bit_wise=False)
@@ -88,6 +89,7 @@ symbol_model = recover_weights(symbol_model, symbol_local_weights_4_7)
 # Avalia o modelo treinado
 symbol_ber, symbol_ser = aval_model(symbol_model, ebno_dbs, max_iter=100000, graph_mode="xla", local=symbol_local_ber_ser_4_7)
 #symbol_ber, symbol_ser = recover_points_model(symbol_local_ber_ser_4_7)
+symbol_ber, symbol_ser = [symbol_ber[ebno] for ebno in ebno_dbs], [symbol_ser[ebno] for ebno in ebno_dbs]
 
 # ============================================================================================ #
 """
@@ -97,7 +99,10 @@ symbol_ber, symbol_ser = aval_model(symbol_model, ebno_dbs, max_iter=100000, gra
 """
 
 ber, ser = txt_to_dict("./Pontos/AFF3CT/Hamming-7-4.txt")
+ber, ser = [ber[ebno] for ebno in ebno_dbs], [ser[ebno] for ebno in ebno_dbs]
+
 ber_uncoded, ser_uncoded = txt_to_dict("./Pontos/AFF3CT/Uncoded-BPSK.txt")
+ber_uncoded, ser_uncoded = [ber_uncoded[ebno] for ebno in ebno_dbs], [ser_uncoded[ebno] for ebno in ebno_dbs]
 
 plt.figure(figsize=(10, 5))
 
@@ -124,4 +129,5 @@ plt.legend()
 plt.grid(True)
 
 plt.tight_layout()
+plt.savefig(f"./Figures/Autoencoder-7-4/Bit-Wise_Symbol-Wise_Comparison.png")
 plt.show()
