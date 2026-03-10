@@ -130,13 +130,24 @@ class End2EndSystem(tf.keras.Model): # Inherits from Keras Model
             axis=[1]
         )
 
-        z = self.transmitter(bits)
+        if self.bit_wise:
+          z = self.transmitter(bits)
+        else:
+          indices = self.bits_to_indices(bits)
+          one_hot = tf.one_hot(indices, depth=self.M)
+          z = self.transmitter(one_hot)
 
         return bits, z
       
       else:
 
-        z = self.transmitter(bits)
+        if self.bit_wise:
+          z = self.transmitter(bits)
+        else:
+          indices = self.bits_to_indices(bits)
+          one_hot = tf.one_hot(indices, depth=self.M)
+          z = self.transmitter(one_hot)
+          
         return z
       
     def calcular_distancias_ordem_n(self, z):
