@@ -34,7 +34,7 @@ local_ber_ser_11_15 = f"./Pontos/Autoencoder/AutoEncoder_{k}_{n}_ER_BitWise-netw
 optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
 
 # Treina o modelo
-train(model_train, SNRdb_train, optimizer, NUM_TRAINING_ITERATIONS, BATCH_SIZE, local_weights_11_15, aval_training=True, steps_for_aval=2500, local_aval=local_aval_11_15)
+#train(model_train, SNRdb_train, optimizer, NUM_TRAINING_ITERATIONS, BATCH_SIZE, local_weights_11_15, aval_training=True, steps_for_aval=2500, local_aval=local_aval_11_15)
 
 # Recupera os pesos treinados
 model = recover_weights(model, local_weights_11_15)
@@ -43,6 +43,7 @@ model = recover_weights(model, local_weights_11_15)
 ebno_dbs = np.arange(-4, 8, 1)
 
 ber, ser = aval_model(model, ebno_dbs, max_iter=100000, graph_mode="xla", local=local_ber_ser_11_15)
+#ber, ser = recover_points_model(local_ber_ser_11_15)
 
 # ============================================================================================ #
 """
@@ -52,7 +53,10 @@ ber, ser = aval_model(model, ebno_dbs, max_iter=100000, graph_mode="xla", local=
 """
 
 ber_uncoded, ser_uncoded = txt_to_dict("./Pontos/AFF3CT/Uncoded-BPSK.txt")
+ber_uncoded, ser_uncoded = [ber_uncoded[ebno] for ebno in ebno_dbs], [ser_uncoded[ebno] for ebno in ebno_dbs]
+
 ber_hamming, ser_hamming = txt_to_dict("./Pontos/AFF3CT/Hamming-15-11.txt")
+ber_hamming, ser_hamming = [ber_hamming[ebno] for ebno in ebno_dbs], [ser_hamming[ebno] for ebno in ebno_dbs]
 
 plt.figure(figsize=(10, 5))
 
@@ -78,4 +82,5 @@ plt.legend()
 plt.grid(True)
 
 plt.tight_layout()
+plt.savefig(f"./Figures/Autoencoder-15-11/BER_SER_Comparison.png")
 plt.show()
