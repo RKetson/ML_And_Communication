@@ -91,7 +91,7 @@ def aval_model(model, ebno_dbs, batch_size=127, block_errors=1000, max_iter=1000
     ber_dict = {ebno: b for ebno, b in zip(ebno_dbs, ber)}
     ser_dict = {ebno: s for ebno, s in zip(ebno_dbs, ser)}
     
-    if local is not None:
+    if local != None:
         with open(local, 'wb') as f:
             pickle.dump([ber_dict, ser_dict], f, protocol=pickle.HIGHEST_PROTOCOL)
     
