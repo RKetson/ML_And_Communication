@@ -27,7 +27,7 @@ model = End2EndSystem(k, n, tx, rx, training=False, bit_wise=True)
 
 # Local de dados
 local_weights_11_15 = f"./Buffer/weights-{k}-{n}-neural-network-bit_wise-network"
-local_aval_11_15 = f'./Buffer/constellations_energyNormalization_E2E_{k}_{n}-bit_wise-network'
+local_aval_11_15 = f'./Buffer/constellations_E2E_{k}_{n}-bit_wise-network'
 local_ber_ser_11_15 = f"./Pontos/Autoencoder/AutoEncoder_{k}_{n}_ER_BitWise-network"
 
 # Otimizador
