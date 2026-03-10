@@ -56,7 +56,7 @@ class Receiver(Layer): # Inherits from Keras Layer
         Arquitetura de um receptor completamente conectado com saída softmax.
     """
 
-    def __init__(self, k, n):
+    def __init__(self, k, n, bit_wise=True):
         """
             Entrada: k (Dimensão de entrada), n (Dimensão de saída)
             Saída: None
@@ -69,7 +69,10 @@ class Receiver(Layer): # Inherits from Keras Layer
         self.conv1d2 = Convolution1D(64, 2, strides=1, padding='valid', activation='relu')
         self.maxpool2 = MaxPooling1D(2)
         self.flatten = Flatten()
-        self.dense_1 = Dense(k, 'sigmoid')
+        if bit_wise:
+            self.dense_1 = Dense(k, 'sigmoid')
+        else:
+            self.dense_1 = Dense(2**k, 'softmax')
 
     def call(self, y):
         """
