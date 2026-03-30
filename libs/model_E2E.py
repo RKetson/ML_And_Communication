@@ -53,7 +53,7 @@ class End2EndSystem(tf.keras.Model): # Inherits from Keras Model
         if bit_wise:
           self.bce = self.bce = tf.keras.losses.BinaryCrossentropy(from_logits=False)
         else:
-          self.bce = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=False)
+          self.bce = tf.keras.losses.CategoricalCrossentropy(from_logits=False)
 
         self.training = training
         self.bit_wise = bit_wise
@@ -278,8 +278,7 @@ class End2EndSystem(tf.keras.Model): # Inherits from Keras Model
             if self.bit_wise:
                 loss = self.bce(bits, recev)
             else:
-                indice = tf.math.argmax(one_hot, axis=-1)
-                loss = self.bce(indice, recev)
+                loss = self.bce(one_hot, recev)
             return loss
         else:
             if self.bit_wise:
