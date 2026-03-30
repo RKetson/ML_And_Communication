@@ -62,6 +62,7 @@ class Receiver(Layer): # Inherits from Keras Layer
             Saída: None
         """
         super().__init__()
+        self.bit_wise = bit_wise
 
         self.reshape = Reshape((n, 1))
         self.conv1d1 = Convolution1D(128, 2, strides=1, padding='valid', activation='relu')
@@ -69,7 +70,8 @@ class Receiver(Layer): # Inherits from Keras Layer
         self.conv1d2 = Convolution1D(64, 2, strides=1, padding='valid', activation='relu')
         self.maxpool2 = MaxPooling1D(2)
         self.flatten = Flatten()
-        if bit_wise:
+        if self.bit_wise:
+            self.dense_0 = Dense(2**k, 'relu')
             self.dense_1 = Dense(k, 'sigmoid')
         else:
             self.dense_1 = Dense(2**k, 'softmax')
@@ -89,6 +91,8 @@ class Receiver(Layer): # Inherits from Keras Layer
         z = self.conv1d2(z)
         z = self.maxpool2(z)
         z = self.flatten(z)
+        if self.bit_wise:
+            z = self.dense_0(z)
         z = self.dense_1(z)
         
         return z
