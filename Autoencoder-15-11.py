@@ -15,7 +15,7 @@ NUM_TRAINING_ITERATIONS = 12500
 # Parametros do sistema
 k = 11
 n = 15
-SNRdb_train = 5.5
+SNRdb_train = 5
 
 # Instancia as camadas do transmissor e receptor
 tx = Net_Conv_v1.transmitter(k, n)
@@ -34,7 +34,7 @@ local_ber_ser_11_15 = f"./Pontos/Autoencoder/AutoEncoder_{k}_{n}_ER_BitWise-netw
 optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
 
 # Treina o modelo
-#train(model_train, SNRdb_train, optimizer, NUM_TRAINING_ITERATIONS, BATCH_SIZE, local_weights_11_15, aval_training=True, steps_for_aval=2500, local_aval=local_aval_11_15)
+train(model_train, SNRdb_train, optimizer, NUM_TRAINING_ITERATIONS, BATCH_SIZE, local_weights_11_15, aval_training=True, steps_for_aval=2500, local_aval=local_aval_11_15)
 
 # Recupera os pesos treinados
 model = recover_weights(model, local_weights_11_15)

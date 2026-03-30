@@ -11,13 +11,13 @@ from libs.AFF3CT_to_points import txt_to_dict
 """
 
 BATCH_SIZE = 25000
-NUM_TRAINING_ITERATIONS = 12500
+NUM_TRAINING_ITERATIONS = 60000
 
 # Parametros do sistema
 k = 4
 n = 7
 SNRdb_train = 5.5
-ebno_dbs = np.arange(-4, 9, 1)
+ebno_dbs = np.arange(-4, 8, 1)
 
 # ============================================================================================ #
 """
@@ -52,7 +52,7 @@ bit_model = recover_weights(bit_model, bit_local_weights_4_7)
 
 # Avalia o modelo treinado
 bit_ber, bit_ser = aval_model(bit_model, ebno_dbs, max_iter=750000, block_errors=500, graph_mode="xla", local=bit_local_ber_ser_4_7)
-#bit_ber, bit_ser = recover_points_model(bit_local_ber_ser_4_7)
+bit_ber, bit_ser = recover_points_model(bit_local_ber_ser_4_7)
 bit_ber, bit_ser = [bit_ber[ebno] for ebno in ebno_dbs], [bit_ser[ebno] for ebno in ebno_dbs]
 
 # ============================================================================================ #
@@ -73,22 +73,22 @@ symbol_model_train = End2EndSystem(k, n, tx, rx, training=True, bit_wise=False)
 symbol_model = End2EndSystem(k, n, tx, rx, training=False, bit_wise=False)
 
 # Local de dados
-symbol_local_weights_4_7 = f"./Buffer/weights-{k}-{n}-neural-network-symbol_wise-network"
-symbol_local_aval_4_7 = f'./Buffer/constellations_energyNormalization_E2E_{k}_{n}-symbol_wise-network'
-symbol_local_ber_ser_4_7 = f"./Pontos/Autoencoder/AutoEncoder_{k}_{n}_ER_SymbolWise-network"
+symbol_local_weights_4_7 = f"./Buffer/weights-{k}-{n}-neural-network-symbol_wise-network_v2"
+symbol_local_aval_4_7 = f'./Buffer/constellations_energyNormalization_E2E_{k}_{n}-symbol_wise-network_v2'
+symbol_local_ber_ser_4_7 = f"./Pontos/Autoencoder/AutoEncoder_{k}_{n}_ER_SymbolWise-network_v2"
 
 # Otimizador
 symbol_optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
 
 # Treina o modelo
-train(symbol_model_train, SNRdb_train, symbol_optimizer, NUM_TRAINING_ITERATIONS, BATCH_SIZE, symbol_local_weights_4_7, aval_training=True, steps_for_aval=2500, local_aval=symbol_local_aval_4_7)
+#train(symbol_model_train, SNRdb_train, symbol_optimizer, NUM_TRAINING_ITERATIONS, BATCH_SIZE, symbol_local_weights_4_7, aval_training=True, steps_for_aval=2500, local_aval=symbol_local_aval_4_7)
 
 # Recupera os pesos treinados
 symbol_model = recover_weights(symbol_model, symbol_local_weights_4_7)
 
 # Avalia o modelo treinado
-symbol_ber, symbol_ser = aval_model(symbol_model, ebno_dbs, max_iter=750000, block_errors=500, graph_mode="xla", local=symbol_local_ber_ser_4_7)
-#symbol_ber, symbol_ser = recover_points_model(symbol_local_ber_ser_4_7)
+#symbol_ber, symbol_ser = aval_model(symbol_model, ebno_dbs, max_iter=750000, block_errors=500, graph_mode="xla", local=symbol_local_ber_ser_4_7)
+symbol_ber, symbol_ser = recover_points_model(symbol_local_ber_ser_4_7)
 symbol_ber, symbol_ser = [symbol_ber[ebno] for ebno in ebno_dbs], [symbol_ser[ebno] for ebno in ebno_dbs]
 
 # ============================================================================================ #
