@@ -98,7 +98,7 @@ symbol_ber, symbol_ser = [symbol_ber[ebno] for ebno in ebno_dbs], [symbol_ser[eb
     Aqui, os resultados de BER e SER dos modelos bit-wise e symbol-wise são comparados e visualizados.
 """
 
-ber, ser = txt_to_dict("./Pontos/AFF3CT/Hamming-7-4.txt")
+ber, ser = txt_to_dict("./Pontos/AFF3CT/Hamming-7-4-MLD.txt")
 ber, ser = [ber[ebno] for ebno in ebno_dbs], [ser[ebno] for ebno in ebno_dbs]
 
 ber_uncoded, ser_uncoded = txt_to_dict("./Pontos/AFF3CT/Uncoded-BPSK.txt")
