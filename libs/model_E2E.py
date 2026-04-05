@@ -51,7 +51,7 @@ class End2EndSystem(tf.keras.Model): # Inherits from Keras Model
         self.receiver = rx
 
         if bit_wise:
-          self.bce = self.bce = tf.keras.losses.BinaryCrossentropy(from_logits=False)
+          self.bce = tf.keras.losses.BinaryCrossentropy(from_logits=False)
         else:
           self.bce = tf.keras.losses.CategoricalCrossentropy(from_logits=False)
 
@@ -237,16 +237,13 @@ class End2EndSystem(tf.keras.Model): # Inherits from Keras Model
 
       # Calcular o valor do SNR linear
       snr_linear = tf.pow(10.0, ebno_db / 10.0)
-      
-      # Calcular a energia por bit do sinal codificado
-      log2M = tf.math.log(tf.cast(self.M, dtype=tf.float32))/tf.math.log(tf.constant(2.))
 
-      noise_psd = 1.0 / (snr_linear * self.coderate * log2M)
+      noise_psd = 1.0 / (self.coderate * snr_linear * self.n)
 
       # Gerar ruído gaussiano ajustado para a dimensionalidade
       noise = tf.random.normal(shape=tf.shape(y), 
-                              mean=0.0, 
-                              stddev=tf.sqrt(noise_psd / self.n),
+                              mean=0.0,
+                              stddev=tf.sqrt(noise_psd),
                               dtype=y.dtype)
       
       # Adicionar o ruído ao sinal codificado
