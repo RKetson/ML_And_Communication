@@ -37,9 +37,9 @@ bit_model_train = End2EndSystem(k, n, bit_tx, bit_rx, training=True, bit_wise=Tr
 bit_model = End2EndSystem(k, n, bit_tx, bit_rx, training=False, bit_wise=True)
 
 # Local de dados
-bit_local_weights_4_7 = f"./Buffer/weights-{k}-{n}-neural-network-bit_wise-network"
-bit_local_aval_4_7 = f'./Buffer/constellations_energyNormalization_E2E_{k}_{n}-bit_wise-network'
-bit_local_ber_ser_4_7 = f"./Pontos/Autoencoder/AutoEncoder_{k}_{n}_ER_BitWise-network"
+bit_local_weights_4_7 = f"./Buffer/Convolutional/weights-{k}-{n}-neural-network-bit_wise-network"
+bit_local_aval_4_7 = f'./Buffer/Convolutional/constellations_energyNormalization_E2E_{k}_{n}-bit_wise-network'
+bit_local_ber_ser_4_7 = f"./Pontos/Autoencoder/Convolutional/AutoEncoder_{k}_{n}_ER_BitWise-network"
 
 # Otimizador
 bit_optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
@@ -73,9 +73,9 @@ symbol_model_train = End2EndSystem(k, n, tx, rx, training=True, bit_wise=False)
 symbol_model = End2EndSystem(k, n, tx, rx, training=False, bit_wise=False)
 
 # Local de dados
-symbol_local_weights_4_7 = f"./Buffer/weights-{k}-{n}-neural-network-symbol_wise-network_v2"
-symbol_local_aval_4_7 = f'./Buffer/constellations_energyNormalization_E2E_{k}_{n}-symbol_wise-network_v2'
-symbol_local_ber_ser_4_7 = f"./Pontos/Autoencoder/AutoEncoder_{k}_{n}_ER_SymbolWise-network_v2"
+symbol_local_weights_4_7 = f"./Buffer/Convolutional/weights-{k}-{n}-neural-network-symbol_wise-network_v2"
+symbol_local_aval_4_7 = f'./Buffer/Convolutional/constellations_energyNormalization_E2E_{k}_{n}-symbol_wise-network_v2'
+symbol_local_ber_ser_4_7 = f"./Pontos/Convolutional/Autoencoder/AutoEncoder_{k}_{n}_ER_SymbolWise-network_v2"
 
 # Otimizador
 symbol_optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
