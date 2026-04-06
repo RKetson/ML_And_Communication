@@ -2,6 +2,8 @@ import libs.tf_config
 import matplotlib.pyplot as plt
 import tensorflow as tf
 import numpy as np
+from sionna.phy.channel import AWGN
+from sionna.phy.utils import ebnodb2no
 
 class EnergyNormalization(tf.keras.Layer):
     """
@@ -12,12 +14,10 @@ class EnergyNormalization(tf.keras.Layer):
     
     def call(self, input):
         x = input
-        center = x - tf.reduce_mean(x, axis=0, keepdims=True)
+        n = tf.cast(tf.shape(x)[-1], dtype=tf.float32)  # Dimensão de saída (n)
 
-
-        energy_avg = tf.reduce_mean(tf.reduce_sum(tf.square(center), axis=-1, keepdims=True), axis=0, keepdims=True)
-
-        energy_sqrt = tf.sqrt(energy_avg)
+        center = x - tf.reduce_mean(x)
+        energy_sqrt = tf.math.reduce_std(x) * tf.sqrt(tf.cast(n, dtype=tf.float32))
 
         x_norm = center / energy_sqrt
 
@@ -236,9 +236,13 @@ class End2EndSystem(tf.keras.Model): # Inherits from Keras Model
       """
 
       # Calcular o valor do SNR linear
-      snr_linear = tf.pow(10.0, ebno_db / 10.0)
+      ebno_db = tf.cast(ebno_db, dtype=tf.float32)
+      ten = tf.constant(10.0, dtype=tf.float32)
+      one = tf.constant(1.0, dtype=tf.float32)
+      two = tf.constant(2.0, dtype=tf.float32)
 
-      noise_psd = 1.0 / (self.coderate * snr_linear * self.n)
+      snr_linear = tf.pow(ten, ebno_db / ten)
+      noise_psd = one / (self.coderate * snr_linear * two)
 
       # Gerar ruído gaussiano ajustado para a dimensionalidade
       noise = tf.random.normal(shape=tf.shape(y), 
