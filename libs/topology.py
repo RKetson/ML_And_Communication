@@ -4,6 +4,91 @@ from collections import namedtuple
 from tensorflow.keras.layers import Dense, Convolution1D, Reshape, MaxPooling1D, Flatten
 from tensorflow.keras import Layer
 
+"""
+    Fully connected
+"""
+################
+## TRASMITTER ##
+################
+
+class Transmitter_FL(Layer):
+    """
+        Arquitetura de um transmissor completamente conectado.
+    """
+
+    def __init__(self, k, n):
+        """
+            Entrada: k (Dimensão de entrada), n (Dimensão de saída)
+            Saída: None
+        """
+        super().__init__()
+
+        self.dense_1 = Dense(2**k, 'relu')
+        self.dense_2 = Dense(n, 'linear')
+        self.dense_3 = EnergyNormalization()
+
+    def call(self, bits):
+        """
+            Entrada: Tensor de bits de tamanho (, k)
+            Saída: Tensor no formato (, n)
+        """
+
+        nn_input = tf.cast(bits, dtype=tf.float32)
+
+        z = self.dense_1(nn_input)
+        z = self.dense_2(z)
+        z = self.dense_3(z)
+
+        return z
+
+
+################
+### RECEIVER ###
+################
+
+class Receiver_FL(Layer): # Inherits from Keras Layer
+
+    def __init__(self, k, n, bit_wise=True):
+        """
+            Entrada: k (Dimensão de entrada), n (Dimensão de saída)
+            Saída: None
+        """
+        super().__init__()
+        self.bit_wise = bit_wise
+        M = 2**k
+
+        # The two dense layers that form the custom trainable neural network-based demapper
+        self.dense_0 = Dense(M, 'relu')
+
+        if self.bit_wise:
+            self.dense_1 = Dense(M, 'relu')
+            self.dense_2 = Dense(k, 'sigmoid')
+        else:
+            self.dense_2 = Dense(M, 'softmax')
+
+    def call(self, y):
+
+        nn_input = y
+        z = self.dense_0(nn_input)
+        if self.bit_wise:
+            z = self.dense_1(z)
+        z = self.dense_2(z)
+
+        return z
+
+__Net_Full_Con = namedtuple('Net_Full_Con', ['transmitter', 'receiver'])
+
+Net_Full_Con = __Net_Full_Con(Transmitter_FL, Receiver_FL)
+"""
+    Net_Full_Con:
+    Arquitetura de um transmissor e receptor completamente conectados.
+"""
+Net_Full_Con.transmitter.__doc__ = Transmitter_FL.__doc__
+Net_Full_Con.receiver.__doc__ = Receiver_FL.__doc__
+# =============================================================================== #
+
+
+
 # =============================================================================== #
 """
     Conv v1:
