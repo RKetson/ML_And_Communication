@@ -5,21 +5,31 @@ import numpy as np
 
 class EnergyNormalization(tf.keras.Layer):
     """
-        Camada personalizada para normalização por energia.
+    Camada personalizada para normalização por energia.
+
+    Garante que E_s = 1, ou seja, a energia média por símbolo transmitido é unitária.
+    Isso é necessário para que a parametrização por Eb/N0 seja correta e comparável
+    entre diferentes modelos e runs.
+
+    NOTA TEÓRICA:
+        A versão anterior subtraía a média do batch (centralização) antes de normalizar.
+        Isso é problemático por dois motivos:
+          1. Introduce bias no gradiente: a centralização é uma função do batch, tornando
+             o ponto da constelação dependente dos outros símbolos do batch atual.
+          2. Viola a constraint de energia: E[||x||^2] = 1 deve valer sobre toda a
+             constelação, não sobre um batch específico. A formulação correta normaliza
+             pelo módulo médio de energia sem remover a média DC.
     """
     def __init__(self, **kwargs):
         super(EnergyNormalization, self).__init__(**kwargs)
-    
+
     def call(self, input):
-        x = input
-        center = x - tf.reduce_mean(x, axis=0, keepdims=True)
+        # Energia média por símbolo: média de ||x_i||^2 sobre o batch
+        # Shape: escalar (média sobre batch e dimensões do símbolo)
+        energy_avg = tf.reduce_mean(tf.reduce_sum(tf.square(input), axis=-1))
 
-
-        energy_avg = tf.reduce_mean(tf.reduce_sum(tf.square(center), axis=-1, keepdims=True), axis=0, keepdims=True)
-
-        energy_sqrt = tf.sqrt(energy_avg)
-
-        x_norm = center / energy_sqrt
+        # Normaliza para que E_s = 1 (energia média unitária)
+        x_norm = input / tf.sqrt(energy_avg)
 
         return x_norm
     
@@ -28,18 +38,20 @@ class End2EndSystem(tf.keras.Model): # Inherits from Keras Model
       Modelo criado para simular um sistem Fim-a-Fim com camadas treináveis.
     """
 
-    def __init__(self, k, n, tx, rx, training=False, bit_wise=False):
+    def __init__(self, k, n, tx, rx, training=False, bit_wise=False, bmi=False):
         """
         Entradas:
-          k: Quantidade de bits de entrada
-          n: Quantidade de bits de saída
-          tx: Camada do transmissor (baseada em symbol-wise ou bit-wise).
-          rx: Camada do receptor (baseada em symbol-wise ou bit-wise).
-          training: True se o modelo for treinável, Falso caso não.
-          bit_wise: True se o modelo for bit-wise, False caso seja symbol-wise.
+          k:        Quantidade de bits de entrada por símbolo.
+          n:        Número de dimensões reais do símbolo transmitido.
+          tx:       Camada do transmissor.
+          rx:       Camada do receptor.
+          training: True se o modelo for usado para treino.
+          bit_wise: True para abordagem bit-wise (transmissor recebe bits, receptor sigmoid).
+          bmi:      True para modo BMI — transmissor recebe one-hot, receptor produz
+                    logits (LLRs) com BCE from_logits=True. Incompatível com bit_wise=True.
         """
 
-        super().__init__() # Must call the Keras model initializer
+        super().__init__()
 
         self.k = k
         self.n = n
@@ -49,13 +61,17 @@ class End2EndSystem(tf.keras.Model): # Inherits from Keras Model
         self.rng = tf.random.get_global_generator()
         self.transmitter = tx
         self.receiver = rx
+        self.bmi = bmi
 
-        if bit_wise:
+        if bmi:
+          # Logits como saída: BCE com from_logits=True é numericamente mais estável
+          self.bce = tf.keras.losses.BinaryCrossentropy(from_logits=True)
+        elif bit_wise:
           self.bce = tf.keras.losses.BinaryCrossentropy(from_logits=False)
         else:
           self.bce = tf.keras.losses.CategoricalCrossentropy(from_logits=False)
 
-        self.training = training
+        self.is_training = training
         self.bit_wise = bit_wise
 
     def bits_to_indices(self, bits):
@@ -232,34 +248,77 @@ class End2EndSystem(tf.keras.Model): # Inherits from Keras Model
 
     def add_GaussianNoise(self, y, ebno_db):
       """
-        Adiciona um ruído de 'ebno_db' aos símbolos transmitidos.
+      Adiciona ruído AWGN gaussiano ao sinal transmitido, parametrizado por Eb/N0.
+
+      DERIVAÇÃO DA VARIÂNCIA DO RUÍDO:
+          - Eb/N0 (linear) = ebno_linear
+          - Taxa de código: R = k/n
+          - Energia por símbolo: E_s = 1 (garantido pela EnergyNormalization)
+          - Dimensões reais por símbolo: n (cada saída do transmissor é real)
+          - Relação entre Es/N0 e Eb/N0: Es/N0 = Eb/N0 * R * n
+            (pois E_s = E_b * k bits por símbolo, e são n dimensões reais)
+          - Variância do ruído por dimensão: sigma^2 = N0/2 = E_s / (2 * Es/N0)
+            => sigma^2 = 1 / (2 * ebno_linear * R * n)
+
+      CORREÇÃO EM RELAÇÃO À VERSÃO ANTERIOR:
+          A versão anterior usava noise_psd = 1/(R * SNR * n), que corresponde
+          à variância total, não por dimensão. Como o tf.random.normal gera uma
+          amostra independente por dimensão, a variância já é por componente,
+          portanto o fator 2 (que divide N0 em cada dimensão I e Q do canal complexo)
+          deve ser aplicado. Para canal puramente real, sigma^2 = N0/2.
       """
+      ebno_linear = tf.pow(10.0, ebno_db / 10.0)
 
-      # Calcular o valor do SNR linear
-      snr_linear = tf.pow(10.0, ebno_db / 10.0)
+      # Variância do ruído por dimensão real: sigma^2 = N0/2
+      # N0 = E_s / (Es/N0) = 1 / (ebno_linear * coderate * n)
+      # sigma^2 = N0/2 = 1 / (2 * ebno_linear * coderate * n)
+      noise_variance = 1.0 / (2.0 * self.coderate * ebno_linear * self.n)
 
-      noise_psd = 1.0 / (self.coderate * snr_linear * self.n)
+      noise = tf.random.normal(
+          shape=tf.shape(y),
+          mean=0.0,
+          stddev=tf.sqrt(noise_variance),
+          dtype=y.dtype
+      )
 
-      # Gerar ruído gaussiano ajustado para a dimensionalidade
-      noise = tf.random.normal(shape=tf.shape(y), 
-                              mean=0.0,
-                              stddev=tf.sqrt(noise_psd),
-                              dtype=y.dtype)
-      
-      # Adicionar o ruído ao sinal codificado
-      noisy_signal = tf.add(y, noise)
+      return tf.add(y, noise)
 
-      return noisy_signal
-
-    @tf.function(jit_compile=True) # Enable graph execution to speed things up
+    @tf.function(jit_compile=True)
     def __call__(self, batch_size, ebno_db):
         """
-          Realiza uma quantidade 'batch_size' de transmissões pelo canal com um SNR de 'ebno_db', demodula e decodifica
-          usando um receptor baseado em symbol-wise ou bit-wise e usa a função binária de entropia cruzada como função de perda (esparça para symbol-wise).
+        Realiza 'batch_size' transmissões com SNR 'ebno_db' e retorna a perda
+        (modo treino) ou o par (bits, bits_hat) (modo inferência).
+
+        Modos suportados:
+          - bmi=True:      Transmissor one-hot, receptor logits, BCE from_logits=True.
+                           Inferência: limiar dos logits em 0 (equiv. sigmoid ≥ 0.5).
+          - bit_wise=True: Transmissor recebe bits, receptor sigmoid, BCE from_logits=False.
+          - bit_wise=False: Transmissor one-hot, receptor softmax, CCE.
         """
 
         bits = self.rng.uniform([batch_size, self.k], 0, 2, tf.int32)
-        
+
+        # ------------------------------------------------------------------ #
+        # Modo BMI: constelação treinável 2D + receptor bit-wise com logits  #
+        # ------------------------------------------------------------------ #
+        if self.bmi:
+            indices = self.bits_to_indices(bits)
+            one_hot = tf.one_hot(indices, depth=self.M)
+            z = self.transmitter(one_hot)         # (batch, 2)
+            y = self.add_GaussianNoise(z, ebno_db)
+            logits = self.receiver(y)             # (batch, k) — LLRs
+
+            if self.is_training:
+                bits_float = tf.cast(bits, tf.float32)
+                return self.bce(bits_float, logits)
+            else:
+                # Limiar em 0: logit > 0 ↔ sigmoid > 0.5
+                bits_hat = tf.cast(tf.math.greater_equal(logits, 0.0), tf.int32)
+                return bits, bits_hat
+
+        # ------------------------------------------------------------------ #
+        # Modos originais: bit-wise ou symbol-wise                           #
+        # ------------------------------------------------------------------ #
         if self.bit_wise:
             z = self.transmitter(bits)
         else:
@@ -268,10 +327,9 @@ class End2EndSystem(tf.keras.Model): # Inherits from Keras Model
             z = self.transmitter(one_hot)
 
         y = self.add_GaussianNoise(z, ebno_db)
-        
         recev = self.receiver(y)
 
-        if self.training:
+        if self.is_training:
             if self.bit_wise:
                 loss = self.bce(bits, recev)
             else:
@@ -279,8 +337,8 @@ class End2EndSystem(tf.keras.Model): # Inherits from Keras Model
             return loss
         else:
             if self.bit_wise:
-              bits_hat = tf.math.greater_equal(recev, 0.5)
-              bits_hat = tf.cast(bits_hat, dtype=tf.int32)
-              return bits, bits_hat
+                bits_hat = tf.math.greater_equal(recev, 0.5)
+                bits_hat = tf.cast(bits_hat, dtype=tf.int32)
+                return bits, bits_hat
             else:
-              return bits, self.indices_to_bits(tf.math.argmax(recev, axis=-1))
+                return bits, self.indices_to_bits(tf.math.argmax(recev, axis=-1))
