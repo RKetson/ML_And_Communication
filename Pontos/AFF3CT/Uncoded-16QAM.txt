@@ -1,0 +1,84 @@
+]633;E;} > ./Pontos/AFF3CT/Uncoded-16QAM.txt;cb22a93e-0e14-4bc3-8511-bfeab4e98db6]633;C[metadata]
+command=aff3ct --sim-type BFER -C UNCODED -K 4 --mdm-type QAM --mdm-bps 4   -m -4 -M 7 -s 1 -e 1000 --chn-type AWGN --chn-implem STD
+title=Uncoded-16QAM
+
+[trace]
+# ----------------------------------------------------
+# ---- A FAST FORWARD ERROR CORRECTION TOOLBOX >> ----
+# ----------------------------------------------------
+# Parameters:
+# * Simulation ------------------------------------
+#    ** Type                  = BFER
+#    ** Type of bits          = int32
+#    ** Type of reals         = float32
+#    ** Date (UTC)            = 2026-05-06 01:25:11
+#    ** Git version           = v4.3.1
+#    ** Code type (C)         = UNCODED
+#    ** Noise range           = -4 -> 7 dB
+#    ** Noise type (E)        = EBN0
+#    ** Seed                  = 0
+#    ** Statistics            = off
+#    ** Debug mode            = off
+#    ** Inter frame level     = 1
+#    ** Multi-threading (t)   = 8 thread(s)
+#    ** Coset approach (c)    = no
+#    ** Coded monitoring      = no
+#    ** Bad frames tracking   = off
+#    ** Bad frames replay     = off
+#    ** Bit rate              = 1 (1/1)
+# * Source ----------------------------------------
+#    ** Type                  = RAND
+#    ** Implementation        = STD
+#    ** Info. bits (K_info)   = 4
+# * Codec -----------------------------------------
+#    ** Type                  = UNCODED
+#    ** Info. bits (K)        = 4
+#    ** Codeword size (N_cw)  = 4
+#    ** Frame size (N)        = 4
+#    ** Code rate             = 1 (1/1)
+# * Decoder ---------------------------------------
+#    ** Type (D)              = NONE
+#    ** Implementation        = HARD_DECISION
+#    ** Systematic            = yes
+# * Modem -----------------------------------------
+#    ** Type                  = QAM
+#    ** Implementation        = STD
+#    ** Bits per symbol       = 4
+#    ** Sigma square          = on
+#    ** Max type              = MAX
+# * Channel ---------------------------------------
+#    ** Type                  = AWGN
+#    ** Implementation        = STD
+#    ** Complex               = on
+#    ** Add users             = off
+# * Monitor ---------------------------------------
+#    ** Lazy reduction        = off
+#    ** Frame error count (e) = 1000
+#    ** Compute mutual info   = no
+# * Terminal --------------------------------------
+#    ** Show Sigma            = off
+#    ** Enabled               = yes
+#    ** Frequency (ms)        = 500
+# 
+# The simulation is running...
+# ---------------------||--------------------------------------------------------||---------------------
+#  Signal Noise Ratio  ||    Bit Error Rate (BER) and Frame Error Rate (FER)     ||  Global throughput  
+#         (SNR)        ||                                                        ||  and elapsed time   
+# ---------------------||--------------------------------------------------------||---------------------
+# ----------|----------||------------|----------|----------|----------|----------||----------|----------
+#     Es/N0 |    Eb/N0 ||        FRA |       BE |       FE |      BER |      FER ||  SIM_THR |    ET/RT 
+#      (dB) |     (dB) ||            |          |          |          |          ||   (Mb/s) | (hhmmss) 
+# ----------|----------||------------|----------|----------|----------|----------||----------|----------
+       2.02 |    -4.00 ||       1489 |     1419 |     1002 | 2.38e-01 | 6.73e-01 ||    3.716 | 00h00'00   
+       3.02 |    -3.00 ||       1576 |     1342 |     1005 | 2.13e-01 | 6.38e-01 ||    4.838 | 00h00'00   
+       4.02 |    -2.00 ||       2228 |     1676 |     1298 | 1.88e-01 | 5.83e-01 ||    6.155 | 00h00'00   
+       5.02 |    -1.00 ||       1929 |     1223 |     1006 | 1.59e-01 | 5.22e-01 ||    5.908 | 00h00'00   
+       6.02 |     0.00 ||       2102 |     1185 |     1006 | 1.41e-01 | 4.79e-01 ||    5.200 | 00h00'00   
+       7.02 |     1.00 ||       2322 |     1144 |     1004 | 1.23e-01 | 4.32e-01 ||    4.421 | 00h00'00   
+       8.02 |     2.00 ||       2940 |     1110 |     1004 | 9.44e-02 | 3.41e-01 ||    4.188 | 00h00'00   
+       9.02 |     3.00 ||       3559 |     1079 |     1004 | 7.58e-02 | 2.82e-01 ||    5.922 | 00h00'00   
+      10.02 |     4.00 ||       4700 |     1074 |     1012 | 5.71e-02 | 2.15e-01 ||    9.243 | 00h00'00   
+      11.02 |     5.00 ||       6368 |     1051 |     1001 | 4.13e-02 | 1.57e-01 ||   10.600 | 00h00'00   
+      12.02 |     6.00 ||       9202 |     1033 |     1000 | 2.81e-02 | 1.09e-01 ||   10.389 | 00h00'00   
+      13.02 |     7.00 ||      14963 |     1021 |     1000 | 1.71e-02 | 6.68e-02 ||   10.312 | 00h00'00   
+# End of the simulation.

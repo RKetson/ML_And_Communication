@@ -126,11 +126,12 @@ for a in A_VALUES:
     results[a] = (ber, ser)
 
 # ============================================================================================ #
-# Referências (BPSK não codificado)
+# Referência: 16-QAM não codificado simulado pelo AFF3CT v4.3.1
+# Parâmetros: UNCODED, K=4, QAM 16, AWGN, 1000 erros mínimos por ponto
 # ============================================================================================ #
-ber_uncoded, ser_uncoded = txt_to_dict("./Pontos/AFF3CT/Uncoded-BPSK.txt")
-ber_uncoded = [ber_uncoded[ebno] for ebno in ebno_dbs]
-ser_uncoded = [ser_uncoded[ebno] for ebno in ebno_dbs]
+ber_16qam_ref, ser_16qam_ref = txt_to_dict("./Pontos/AFF3CT/Uncoded-16QAM.txt")
+ber_16qam_ref = [ber_16qam_ref.get(ebno, float('nan')) for ebno in ebno_dbs]
+ser_16qam_ref = [ser_16qam_ref.get(ebno, float('nan')) for ebno in ebno_dbs]
 
 # ============================================================================================ #
 # Plot: BER e SER
@@ -138,12 +139,13 @@ ser_uncoded = [ser_uncoded[ebno] for ebno in ebno_dbs]
 markers = ['o', 's', '^', 'D']
 colors  = ['#e63946', '#457b9d', '#2a9d8f', '#e9c46a']
 
-fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+fig, axes = plt.subplots(1, 2, figsize=(13, 5))
 
 for ax, metric_idx, ylabel, title in [
-    (axes[0], 0, 'BER', 'Bit Error Rate — BMI Autoencoder'),
-    (axes[1], 1, 'SER', 'Symbol Error Rate — BMI Autoencoder'),
+    (axes[0], 0, 'BER', 'Bit Error Rate — BMI Autoencoder vs 16-QAM'),
+    (axes[1], 1, 'SER', 'Symbol Error Rate — BMI Autoencoder vs 16-QAM'),
 ]:
+    # Curvas do autoencoder BMI para diferentes capacidades do receptor
     for i, a in enumerate(A_VALUES):
         ber, ser = results[a]
         values = ber if metric_idx == 0 else ser
@@ -151,8 +153,10 @@ for ax, metric_idx, ylabel, title in [
                     marker=markers[i], color=colors[i], linewidth=1.8, markersize=6,
                     label=f'BMI a={a}  ({2**(k+a)} neurônios)')
 
-    ref = ber_uncoded if metric_idx == 0 else ser_uncoded
-    ax.semilogy(ebno_dbs, ref, 'k--', linewidth=1.5, label='BPSK não codificado')
+    # Referência: 16-QAM Gray-coded simulado via AFF3CT (mesmos parâmetros do autoencoder)
+    ref = ber_16qam_ref if metric_idx == 0 else ser_16qam_ref
+    ax.semilogy(ebno_dbs, ref, 'k-', linewidth=2.0, marker='x', markersize=7,
+                label='16-QAM (AFF3CT, referência)')
 
     ax.set_xlabel('Eb/N0 (dB)', fontsize=12)
     ax.set_ylabel(ylabel, fontsize=12)
