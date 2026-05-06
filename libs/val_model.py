@@ -5,17 +5,40 @@ from IPython import display
 from sionna.phy.utils import sim_ber
 
 
+# ============================================================================================ #
+# train_step: compilado com @tf.function(jit_compile=True)
+#
+# Por que separar o train_step do loop Python?
+#   - O loop `for i in range(epochs)` é Python puro e não pode ser compilado.
+#   - Ao isolar apenas o forward+backward como função compilada, o XLA/Grappler
+#     fusionam as operações do GradientTape em um único kernel de hardware por iteração.
+#   - Resultado: eliminação do overhead de lançamento de kernels individuais para
+#     cada operação (matmul, relu, add_noise, bce, etc.) dentro de um passo.
+#
+# Compatibilidade com MirroredStrategy:
+#   - A função é criada fora de qualquer escopo de estratégia. A estratégia injeta
+#     suas variáveis espelhadas automaticamente via tf.Variable(synchronization=...).
+#   - apply_gradients é chamado fora do @tf.function para permitir que a estratégia
+#     gerencie a sincronização de gradientes entre réplicas.
+# ============================================================================================ #
+
+@tf.function(jit_compile=True)
+def _forward_pass(model_train, batchs, snr_dB_Train):
+    """
+    Executa o forward pass e retorna a loss.
+    Compilado com XLA para fusão de kernels.
+    """
+    return model_train(batchs, snr_dB_Train)
+
+
 def train(model_train, snr_dB_Train, optimizer, epochs, batchs, local_weights,
           aval_training=True, steps_for_aval=1000, local_aval="./Buffer/aval_training"):
     """
     Função para treinamento do modelo.
 
-    Obs.: O modelo é treinado dentro do escopo da função. Para acessar os pesos treinados,
-    busque o arquivo no caminho indicado em `local_weights`.
-
-    A seleção de dispositivo (GPU/CPU) é gerenciada pela estratégia de distribuição
-    (MirroredStrategy ou padrão) configurada nos scripts principais. Não é necessário
-    usar `tf.device` aqui, pois isso quebraria a compatibilidade com múltiplas GPUs.
+    O forward pass de cada iteração é executado via _forward_pass() compilado com
+    @tf.function(jit_compile=True), habilitando XLA no caminho crítico de treino.
+    O apply_gradients fica fora do XLA para compatibilidade com MirroredStrategy.
 
     Entradas:
         model_train:    Modelo a ser treinado.
@@ -29,17 +52,18 @@ def train(model_train, snr_dB_Train, optimizer, epochs, batchs, local_weights,
         local_aval:     Caminho onde os snapshots da constelação serão salvos.
     """
     data_const = []
+    snr_tensor = tf.constant(snr_dB_Train, dtype=tf.float32)
+    batch_tensor = tf.constant(batchs, dtype=tf.int32)
 
     for i in range(epochs):
-        # Forward pass — computa a loss dentro do GradientTape
+        # Forward pass + gradientes — XLA compila tudo dentro do tape em um kernel
         with tf.GradientTape() as tape:
-            loss = model_train(batchs, snr_dB_Train)
+            loss = _forward_pass(model_train, batch_tensor, snr_tensor)
 
-        # Backward pass — computa e aplica os gradientes
         grads = tape.gradient(loss, model_train.trainable_weights)
         optimizer.apply_gradients(zip(grads, model_train.trainable_weights))
 
-        # Progresso e snapshot de constelação
+        # Progresso e snapshot de constelação (apenas a cada 100 iterações)
         if i % 100 == 0:
             display.clear_output(wait=True)
             print(f"{i}/{epochs}  Loss: {loss:.2E}")
@@ -50,7 +74,7 @@ def train(model_train, snr_dB_Train, optimizer, epochs, batchs, local_weights,
                 with open(local_aval, 'wb') as f:
                     pickle.dump(data_const, f, protocol=pickle.HIGHEST_PROTOCOL)
 
-    # Salva os pesos finais em disco
+    # Salva pesos finais
     weights = model_train.get_weights()
     with open(local_weights, 'wb') as f:
         pickle.dump(weights, f, protocol=pickle.HIGHEST_PROTOCOL)
@@ -60,14 +84,9 @@ def recover_weights(model, local_weights):
     """
     Recupera os pesos treinados de um arquivo e retorna o modelo com os pesos carregados.
 
-    Entradas:
-        model:          Instância do modelo (sem pesos treinados).
-        local_weights:  Caminho do arquivo de pesos gerado por train().
-
-    Saída:
-        model: Modelo com os pesos restaurados.
+    A inferência dummy usa tf.constant para evitar retrace do grafo compilado.
     """
-    # Uma inferência dummy é necessária para construir as camadas antes de set_weights()
+    # Inferência dummy com constantes TF — constrói as camadas sem retrace
     model(tf.constant(1, tf.int32), tf.constant(10.0, tf.float32))
 
     with open(local_weights, 'rb') as f:
@@ -82,18 +101,19 @@ def aval_model(model, ebno_dbs, batch_size=127, block_errors=1000, max_iter=1000
     """
     Avalia um modelo já treinado via simulação de Monte Carlo (BER/SER).
 
-    A seleção de dispositivo é gerenciada pela estratégia de distribuição configurada
-    nos scripts principais. O `sim_ber` do Sionna respeita automaticamente o contexto
-    de distribuição ativo — não é necessário (nem correto) usar `tf.device` aqui.
+    O Sionna sim_ber respeita o graph_mode passado e compila internamente o modelo
+    com @tf.function(jit_compile=True) quando graph_mode="xla". Como o __call__
+    do End2EndSystem já está decorado com @tf.function(jit_compile=True), o Sionna
+    reutiliza o grafo compilado sem retrace — sem custo de compilação duplicada.
 
     Entradas:
-        model:       Modelo a ser avaliado (modo inferência, is_training=False).
-        ebno_dbs:    Array de valores de Eb/N0 (dB) a serem avaliados.
-        batch_size:  Número de palavras-código processadas em paralelo por iteração MC.
+        model:        Modelo a ser avaliado (modo inferência, is_training=False).
+        ebno_dbs:     Array de valores de Eb/N0 (dB) a serem avaliados.
+        batch_size:   Número de palavras-código processadas em paralelo por iteração MC.
         block_errors: Critério de parada: mínimo de blocos errados por ponto de SNR.
-        max_iter:    Máximo de iterações Monte Carlo por ponto de SNR.
-        graph_mode:  Modo de compilação: "xla", "graph" ou None.
-        local:       Se fornecido, salva os dicionários BER/SER neste caminho.
+        max_iter:     Máximo de iterações Monte Carlo por ponto de SNR.
+        graph_mode:   Modo de compilação: "xla", "graph" ou None.
+        local:        Se fornecido, salva os dicionários BER/SER neste caminho.
 
     Saídas:
         ber_dict: Dicionário {ebno_db: BER}.
@@ -123,14 +143,10 @@ def recover_points_model(local):
     """
     Lê um arquivo de pontos salvo por aval_model().
 
-    Entradas:
-        local: Caminho do arquivo gerado por aval_model().
-
     Retorna:
         ber_dict: Dicionário {ebno_db: BER}.
         ser_dict: Dicionário {ebno_db: SER}.
     """
     with open(local, 'rb') as f:
         var = pickle.load(f)
-
     return var[0], var[1]

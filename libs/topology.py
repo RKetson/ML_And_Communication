@@ -27,18 +27,16 @@ class Transmitter_FL(Layer):
         self.dense_2 = Dense(n, 'linear')
         self.dense_3 = EnergyNormalization()
 
+    @tf.function
     def call(self, bits):
         """
             Entrada: Tensor de bits de tamanho (, k)
             Saída: Tensor no formato (, n)
         """
-
         nn_input = tf.cast(bits, dtype=tf.float32)
-
         z = self.dense_1(nn_input)
         z = self.dense_2(z)
         z = self.dense_3(z)
-
         return z
 
 
@@ -66,14 +64,12 @@ class Receiver_FL(Layer): # Inherits from Keras Layer
         else:
             self.dense_2 = Dense(M, 'softmax')
 
+    @tf.function
     def call(self, y):
-
-        nn_input = y
-        z = self.dense_0(nn_input)
+        z = self.dense_0(y)
         if self.bit_wise:
             z = self.dense_1(z)
         z = self.dense_2(z)
-
         return z
 
 __Net_Full_Con = namedtuple('Net_Full_Con', ['transmitter', 'receiver'])
@@ -117,20 +113,18 @@ class Transmitter(Layer): # Inherits from Keras Layer
         self.dense_2 = Dense(n, 'linear')
         self.dense_3 = EnergyNormalization()
 
+    @tf.function
     def call(self, bits):
         """
             Entrada: Tensor de bits de tamanho (, k)
             Saída: Tensor no formato (, n)
         """
-
         nn_input = tf.cast(bits, dtype=tf.float32)
-
         z = self.dense_1(nn_input)
         z = self.dense_2(z)
         z = self.dense_3(z)
-
         return z
-    
+
 
 ################
 ### RECEIVER ###
@@ -161,16 +155,13 @@ class Receiver(Layer): # Inherits from Keras Layer
         else:
             self.dense_1 = Dense(2**k, 'softmax')
 
+    @tf.function
     def call(self, y):
         """
             Entrada: Tensor (, n)
-            Saída: Tensor (, M)
-
-            Obs.: Saídas no formato de logits
+            Saída: Tensor (, M) com logits ou probabilidades
         """
-
-        nn_input = y
-        z = self.reshape(nn_input)
+        z = self.reshape(y)
         z = self.conv1d1(z)
         z = self.maxpool1(z)
         z = self.conv1d2(z)
@@ -179,7 +170,6 @@ class Receiver(Layer): # Inherits from Keras Layer
         if self.bit_wise:
             z = self.dense_0(z)
         z = self.dense_1(z)
-        
         return z
 
 __Net_Conv_v1 = namedtuple('Net_Conv_v1', ['transmitter', 'receiver'])
@@ -238,13 +228,14 @@ class Transmitter_BMI(Layer):
         self.constellation = Dense(2, activation='linear', use_bias=False)
         self.normalization = EnergyNormalization()
 
+    @tf.function
     def call(self, one_hot):
         """
         Entrada: Tensor one-hot de tamanho (batch, M).
         Saída:   Tensor de símbolos normalizados de tamanho (batch, 2).
         """
-        z = self.constellation(one_hot)   # (batch, M) → (batch, 2)
-        z = self.normalization(z)          # garante E[||z||^2] = 1
+        z = self.constellation(one_hot)
+        z = self.normalization(z)
         return z
 
 
@@ -275,6 +266,7 @@ class Receiver_BMI(Layer):
         self.dense_hidden = Dense(hidden_size, activation='relu')
         self.dense_output = Dense(k, activation='linear')   # logits / LLRs
 
+    @tf.function
     def call(self, y):
         """
         Entrada: Tensor do sinal recebido de tamanho (batch, 2).
