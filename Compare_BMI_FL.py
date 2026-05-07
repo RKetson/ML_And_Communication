@@ -61,8 +61,8 @@ NUM_TRAINING_ITER    = 8000
 
 k           = 4          # Bits de informação por símbolo
 n           = 2          # Dimensões reais do símbolo transmitido (I e Q)
-SNRdb_train = 7.0        # SNR de treinamento (dB)
-ebno_dbs    = np.arange(-4, 8, 1)
+SNRdb_train = 8.0        # SNR de treinamento (dB)
+ebno_dbs    = np.arange(-4, 15, 1)
 
 # Valores de `a` a comparar
 A_VALUES = [0, 1, 2, 3]
