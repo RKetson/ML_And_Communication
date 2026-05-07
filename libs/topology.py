@@ -27,7 +27,6 @@ class Transmitter_FL(Layer):
         self.dense_2 = Dense(n, 'linear')
         self.dense_3 = EnergyNormalization()
 
-    @tf.function
     def call(self, bits):
         """
             Entrada: Tensor de bits de tamanho (, k)
@@ -64,7 +63,6 @@ class Receiver_FL(Layer): # Inherits from Keras Layer
         else:
             self.dense_2 = Dense(M, 'softmax')
 
-    @tf.function
     def call(self, y):
         z = self.dense_0(y)
         if self.bit_wise:
@@ -113,7 +111,6 @@ class Transmitter(Layer): # Inherits from Keras Layer
         self.dense_2 = Dense(n, 'linear')
         self.dense_3 = EnergyNormalization()
 
-    @tf.function
     def call(self, bits):
         """
             Entrada: Tensor de bits de tamanho (, k)
@@ -155,7 +152,6 @@ class Receiver(Layer): # Inherits from Keras Layer
         else:
             self.dense_1 = Dense(2**k, 'softmax')
 
-    @tf.function
     def call(self, y):
         """
             Entrada: Tensor (, n)
@@ -228,7 +224,6 @@ class Transmitter_BMI(Layer):
         self.constellation = Dense(2, activation='linear', use_bias=False)
         self.normalization = EnergyNormalization()
 
-    @tf.function
     def call(self, one_hot):
         """
         Entrada: Tensor one-hot de tamanho (batch, M).
@@ -266,7 +261,6 @@ class Receiver_BMI(Layer):
         self.dense_hidden = Dense(hidden_size, activation='relu')
         self.dense_output = Dense(k, activation='linear')   # logits / LLRs
 
-    @tf.function
     def call(self, y):
         """
         Entrada: Tensor do sinal recebido de tamanho (batch, 2).

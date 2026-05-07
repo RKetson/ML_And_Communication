@@ -6,29 +6,42 @@ from sionna.phy.utils import sim_ber
 
 
 # ============================================================================================ #
-# train_step: compilado com @tf.function(jit_compile=True)
+# _train_step: compilado com @tf.function
 #
-# Por que separar o train_step do loop Python?
-#   - O loop `for i in range(epochs)` é Python puro e não pode ser compilado.
-#   - Ao isolar apenas o forward+backward como função compilada, o XLA/Grappler
-#     fusionam as operações do GradientTape em um único kernel de hardware por iteração.
-#   - Resultado: eliminação do overhead de lançamento de kernels individuais para
-#     cada operação (matmul, relu, add_noise, bce, etc.) dentro de um passo.
+# POR QUE O GradientTape DEVE ESTAR DENTRO DA MESMA @tf.function DO FORWARD PASS?
 #
-# Compatibilidade com MirroredStrategy:
-#   - A função é criada fora de qualquer escopo de estratégia. A estratégia injeta
-#     suas variáveis espelhadas automaticamente via tf.Variable(synchronization=...).
-#   - apply_gradients é chamado fora do @tf.function para permitir que a estratégia
-#     gerencie a sincronização de gradientes entre réplicas.
+#   Quando separamos o forward pass em um @tf.function(jit_compile=True) independente
+#   e chamamos de dentro de um GradientTape externo, o XLA compila o forward como um
+#   bloco opaco — a tape não consegue rastrear operações DENTRO do bloco XLA compilado,
+#   retornando gradientes None para todas as variáveis.
+#
+#   A solução correta (padrão canônico TF2) é colocar tape + forward + gradient dentro
+#   de uma única @tf.function. O TF então traça o grafo completo forward+backward como
+#   um único grafo diferenciável.
+#
+#   NOTA: Usamos @tf.function SEM jit_compile=True no _train_step externo porque:
+#     1. GradientTape com jit_compile pode ter problemas com ops de grad customizadas.
+#     2. O __call__ do modelo já tem @tf.function(jit_compile=True) — o XLA é aplicado
+#        na parte computacionalmente intensiva (rede neural + canal), que é o que importa.
+#     3. O @tf.function externo elimina o overhead Python entre iterações via graph mode.
+#
+#   Compatibilidade com MirroredStrategy:
+#     apply_gradients fica FORA do @tf.function, permitindo que a estratégia gerencie
+#     a sincronização de gradientes entre réplicas (AllReduce).
 # ============================================================================================ #
 
-@tf.function(jit_compile=True)
-def _forward_pass(model_train, batchs, snr_dB_Train):
+@tf.function
+def _train_step(model_train, batch_tensor, snr_tensor):
     """
-    Executa o forward pass e retorna a loss.
-    Compilado com XLA para fusão de kernels.
+    Executa um passo de treinamento: forward pass + cálculo de gradientes.
+    Retorna (loss, grads) para que apply_gradients seja chamado fora,
+    mantendo compatibilidade com MirroredStrategy.
     """
-    return model_train(batchs, snr_dB_Train)
+    with tf.GradientTape() as tape:
+        loss = model_train(batch_tensor, snr_tensor)
+    grads = tape.gradient(loss, model_train.trainable_weights)
+    return loss, grads
+
 
 
 def train(model_train, snr_dB_Train, optimizer, epochs, batchs, local_weights,
@@ -56,11 +69,9 @@ def train(model_train, snr_dB_Train, optimizer, epochs, batchs, local_weights,
     batch_tensor = tf.constant(batchs, dtype=tf.int32)
 
     for i in range(epochs):
-        # Forward pass + gradientes — XLA compila tudo dentro do tape em um kernel
-        with tf.GradientTape() as tape:
-            loss = _forward_pass(model_train, batch_tensor, snr_tensor)
-
-        grads = tape.gradient(loss, model_train.trainable_weights)
+        # _train_step: forward + gradientes num único grafo compilado (@tf.function)
+        # apply_gradients fora para compatibilidade com MirroredStrategy (AllReduce)
+        loss, grads = _train_step(model_train, batch_tensor, snr_tensor)
         optimizer.apply_gradients(zip(grads, model_train.trainable_weights))
 
         # Progresso e snapshot de constelação (apenas a cada 100 iterações)
