@@ -47,7 +47,7 @@ gpus = tf.config.list_physical_devices('GPU')
 if gpus:
     for gpu in gpus:
         tf.config.experimental.set_memory_growth(gpu, True)
-    strategy = tf.distribute.MirroredStrategy()
+    strategy = tf.distribute.get_strategy()
     print(f"Treinamento distribuído em {strategy.num_replicas_in_sync} GPU(s).")
 else:
     strategy = tf.distribute.get_strategy()
@@ -107,13 +107,13 @@ for a in A_VALUES:
         )
         optimizer = tf.keras.optimizers.Adam(learning_rate=lr_schedule)
 
-    # Treinamento
-    if FORCE_RETRAIN or not os.path.exists(local_weights):
-        train(bmi_model_train, SNRdb_train, optimizer, NUM_TRAINING_ITER, BATCH_SIZE,
-              local_weights, aval_training=True, steps_for_aval=2500, local_aval=local_aval)
+        # Treinamento
+        if FORCE_RETRAIN or not os.path.exists(local_weights):
+            train(bmi_model_train, SNRdb_train, optimizer, NUM_TRAINING_ITER, BATCH_SIZE,
+                local_weights, aval_training=True, steps_for_aval=2500, local_aval=local_aval)
 
-    # Recupera pesos
-    bmi_model = recover_weights(bmi_model, local_weights)
+        # Recupera pesos
+        bmi_model = recover_weights(bmi_model, local_weights)
 
     # Avaliação Monte Carlo
     if FORCE_RETRAIN or not os.path.exists(local_ber_ser):
