@@ -31,21 +31,10 @@ class EnergyNormalization(tf.keras.Layer):
         super(EnergyNormalization, self).__init__(**kwargs)
 
     def call(self, input):
-<<<<<<< HEAD
-        x = input
-        n = tf.cast(tf.shape(x)[-1], dtype=tf.float32)  # Dimensão de saída (n)
-
-        center = x - tf.reduce_mean(x)
-        energy_sqrt = tf.math.reduce_std(x) * tf.sqrt(tf.cast(n, dtype=tf.float32))
-
-        x_norm = center / energy_sqrt
-
-=======
         # Energia média por símbolo: média de ||x_i||^2 sobre o batch
         energy_avg = tf.reduce_mean(tf.reduce_sum(tf.square(input), axis=-1))
         # Normaliza para que E_s = 1 (energia média unitária)
         x_norm = input / tf.sqrt(energy_avg)
->>>>>>> origin/dev
         return x_norm
 
 
@@ -145,16 +134,6 @@ class End2EndSystem(tf.keras.Model):
         """
         Adiciona ruído AWGN gaussiano ao sinal transmitido, parametrizado por Eb/N0.
 
-<<<<<<< HEAD
-      # Calcular o valor do SNR linear
-      ebno_db = tf.cast(ebno_db, dtype=tf.float32)
-      ten = tf.constant(10.0, dtype=tf.float32)
-      one = tf.constant(1.0, dtype=tf.float32)
-      two = tf.constant(2.0, dtype=tf.float32)
-
-      snr_linear = tf.pow(ten, ebno_db / ten)
-      noise_psd = one / (self.coderate * snr_linear * two)
-=======
         DERIVAÇÃO DA VARIÂNCIA DO RUÍDO:
             - Eb/N0 (linear) = ebno_linear
             - Taxa de código: R = k/n
@@ -173,7 +152,6 @@ class End2EndSystem(tf.keras.Model):
             dtype=y.dtype
         )
         return tf.add(y, noise)
->>>>>>> origin/dev
 
     # ---------------------------------------------------------------------- #
     # Forward pass compilado com XLA (jit_compile=True)                       #
