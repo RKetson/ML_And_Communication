@@ -49,7 +49,7 @@ class End2EndSystem(tf.keras.Model):
     pois é chamado apenas para visualização e não faz parte do caminho crítico.
     """
 
-    def __init__(self, k, n, tx, rx, training=False, bit_wise=False, bmi=False):
+    def __init__(self, k, n, tx, rx, training=False, bit_wise=False):
         """
         Entradas:
           k:        Quantidade de bits de entrada por símbolo.
@@ -71,12 +71,9 @@ class End2EndSystem(tf.keras.Model):
         self.rng = tf.random.get_global_generator()
         self.transmitter = tx
         self.receiver = rx
-        self.bmi = bmi
 
-        if bmi:
+        if bit_wise:
             self.bce = tf.keras.losses.BinaryCrossentropy(from_logits=True)
-        elif bit_wise:
-            self.bce = tf.keras.losses.BinaryCrossentropy(from_logits=False)
         else:
             self.bce = tf.keras.losses.CategoricalCrossentropy(from_logits=False)
 
@@ -172,52 +169,27 @@ class End2EndSystem(tf.keras.Model):
         kernel de hardware — eliminando overhead de lançamento de kernels separados.
 
         NOTA SOBRE if/else Python vs tf.cond:
-            Os branches if self.bmi / if self.bit_wise são resolvidos em tempo de
+            Os branches if self.bit_wise são resolvidos em tempo de
             traçagem do grafo (tracing-time), não em runtime. Portanto, são branches
             Python legítimos que o XLA dobra em especializações do grafo — sem
             custo de runtime, sem necessidade de tf.cond.
         """
         bits = self.rng.uniform([batch_size, self.k], 0, 2, tf.int32)
 
-        # ------------------------------------------------------------------ #
-        # Modo BMI: constelação treinável 2D + receptor bit-wise com logits   #
-        # ------------------------------------------------------------------ #
-        if self.bmi:
-            indices = self.bits_to_indices(bits)
-            one_hot = tf.one_hot(indices, depth=self.M)
-            z       = self.transmitter(one_hot)
-            y       = self.add_GaussianNoise(z, ebno_db)
-            logits  = self.receiver(y)
-
-            if self.is_training:
-                bits_float = tf.cast(bits, tf.float32)
-                return self.bce(bits_float, logits)
-            else:
-                # Limiar em 0: logit ≥ 0 ↔ sigmoid ≥ 0.5
-                return bits, tf.cast(tf.math.greater_equal(logits, 0.0), tf.int32)
-
-        # ------------------------------------------------------------------ #
-        # Modos originais: bit-wise ou symbol-wise                            #
-        # ------------------------------------------------------------------ #
-        if self.bit_wise:
-            z = self.transmitter(bits)
-        else:
-            indices = self.bits_to_indices(bits)
-            one_hot = tf.one_hot(indices, depth=self.M)
-            z       = self.transmitter(one_hot)
-
-        y     = self.add_GaussianNoise(z, ebno_db)
-        recev = self.receiver(y)
+        indices = self.bits_to_indices(bits)
+        one_hot = tf.one_hot(indices, depth=self.M)
+        z       = self.transmitter(one_hot)
+        y       = self.add_GaussianNoise(z, ebno_db)
+        logits  = self.receiver(y)
 
         if self.is_training:
-            loss = self.bce(bits, recev) if self.bit_wise else self.bce(one_hot, recev)
-            return loss
+            bits_float = tf.cast(bits, tf.float32)
+            return self.bce(bits_float, logits) if self.bit_wise else self.bce(one_hot, logits)
         else:
             if self.bit_wise:
-                bits_hat = tf.cast(tf.math.greater_equal(recev, 0.5), tf.int32)
-                return bits, bits_hat
+                return bits, tf.cast(tf.math.greater_equal(logits, 0.0), tf.int32)
             else:
-                return bits, self.indices_to_bits(tf.math.argmax(recev, axis=-1))
+                return bits, self.indices_to_bits(tf.math.argmax(logits, axis=-1))
 
     # ---------------------------------------------------------------------- #
     # Visualização — mantida fora do grafo XLA intencionalmente               #
@@ -240,14 +212,11 @@ class End2EndSystem(tf.keras.Model):
                 axis=[1]
             )
 
-        if self.bmi or not self.bit_wise:
-            indices = self.bits_to_indices(bits)
-            one_hot = tf.one_hot(indices, depth=self.M)
-            z       = self.transmitter(one_hot)
-        else:
-            z = self.transmitter(bits)
+        indices = self.bits_to_indices(bits)
+        one_hot = tf.one_hot(indices, depth=self.M)
+        z       = self.transmitter(one_hot)
 
-        if bits is None or self.bmi or not self.bit_wise:
+        if bits is None or not self.bit_wise:
             return bits, z
         return z
 

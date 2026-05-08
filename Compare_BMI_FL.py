@@ -96,8 +96,8 @@ for a in A_VALUES:
         bmi_tx = Net_BMI.transmitter(k)
         bmi_rx = Net_BMI.receiver(k, a=a)
 
-        bmi_model_train = End2EndSystem(k, n, bmi_tx, bmi_rx, training=True,  bmi=True)
-        bmi_model       = End2EndSystem(k, n, bmi_tx, bmi_rx, training=False, bmi=True)
+        bmi_model_train = End2EndSystem(k, n, bmi_tx, bmi_rx, training=True,  bit_wise=True)
+        bmi_model       = End2EndSystem(k, n, bmi_tx, bmi_rx, training=False, bit_wise=True)
 
         # Taxa de aprendizado decrescente (Cosine Decay)
         lr_schedule = tf.keras.optimizers.schedules.CosineDecay(
