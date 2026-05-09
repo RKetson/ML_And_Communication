@@ -1,4 +1,3 @@
-import libs.tf_config
 import tensorflow as tf
 import numpy as np
 from sionna.phy.channel import AWGN
