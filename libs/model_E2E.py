@@ -76,7 +76,7 @@ class End2EndSystem(tf.keras.Model):
         if bit_wise:
             self.bce = tf.keras.losses.BinaryCrossentropy(from_logits=True)
         else:
-            self.bce = tf.keras.losses.CategoricalCrossentropy(from_logits=False)
+            self.bce = tf.keras.losses.CategoricalCrossentropy(from_logits=True)
 
         self.is_training = training
         self.bit_wise = bit_wise
