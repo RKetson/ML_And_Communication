@@ -282,3 +282,68 @@ Net_BMI = __Net_BMI(Transmitter_BMI, Receiver_BMI)
 Net_BMI.transmitter.__doc__ = Transmitter_BMI.__doc__
 Net_BMI.receiver.__doc__ = Receiver_BMI.__doc__
 # =============================================================================== #
+
+
+
+# =============================================================================== #
+"""
+    Net_MI:
+
+    Arquitetura para maximização da Informação Mútua (Symbol-wise).
+
+    Transmissor:
+        Igual ao Net_BMI (Transmitter_BMI).
+
+    Receptor:
+        Recebe o sinal ruidoso 2D (y_I, y_Q) e produz M = 2^k probabilidades
+        (uma para cada símbolo). A capacidade do receptor é controlada pelo
+        parâmetro `a`: o número de neurônios da camada oculta é 2^(k+a).
+"""
+
+################
+### RECEIVER ###
+################
+
+class Receiver_MI(Layer):
+    """
+    Receptor para demodulação symbol-wise.
+
+    Recebe o sinal ruidoso 2D e produz M = 2^k probabilidades,
+    uma para cada símbolo. A saída é softmax, compatível
+    com CategoricalCrossentropy(from_logits=False) durante o treinamento.
+
+    O parâmetro `a` controla a capacidade da camada oculta:
+        neurônios_ocultos = 2^(k + a)
+
+    Entradas:
+        k: Número de bits de informação por símbolo.
+        a: Expoente de capacidade (default=0). a=0 → 2^k neurônios.
+    """
+
+    def __init__(self, k, a=0):
+        super().__init__()
+        M = 2 ** k
+        hidden_size = 2 ** (k + a)
+        self.dense_hidden = Dense(hidden_size, activation='relu')
+        self.dense_output = Dense(M, activation='softmax')   # Probabilidades
+
+    def call(self, y):
+        """
+        Entrada: Tensor do sinal recebido de tamanho (batch, 2).
+        Saída:   Tensor de probabilidades de tamanho (batch, M).
+        """
+        z = self.dense_hidden(y)
+        z = self.dense_output(z)
+        return z
+
+__Net_MI = namedtuple('Net_MI', ['transmitter', 'receiver'])
+
+Net_MI = __Net_MI(Transmitter_BMI, Receiver_MI)
+"""
+    Net_MI:
+    Transmissor com constelação treinável 2D + receptor symbol-wise com saída softmax.
+    Use com End2EndSystem(k, n=2, tx, rx, bit_wise=False).
+"""
+Net_MI.transmitter.__doc__ = Transmitter_BMI.__doc__
+Net_MI.receiver.__doc__ = Receiver_MI.__doc__
+# =============================================================================== #
