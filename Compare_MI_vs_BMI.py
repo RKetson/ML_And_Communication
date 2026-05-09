@@ -56,7 +56,7 @@ ebno_dbs    = np.arange(-4, 15, 1)
 
 # Defina aqui os melhores valores de 'a' encontrados nos scripts Compare_BMI_FL.py e Compare_MI_FL.py
 # (Exemplo: se descobrir que a=2 é melhor para BMI e a=3 para MI, modifique estas variáveis)
-BEST_A_BMI = 3
+BEST_A_BMI = 2
 BEST_A_MI  = 2
 
 # ============================================================================================ #

@@ -64,7 +64,7 @@ SNRdb_train = 8.0        # SNR de treinamento (dB)
 ebno_dbs    = np.arange(-4, 15, 1)
 
 # Valores de `a` a comparar
-A_VALUES = [0, 1, 2, 3]
+A_VALUES = [0, 1, 2, 3, 4]
 
 # ============================================================================================ #
 # Diretórios de saída
@@ -131,8 +131,8 @@ ser_16qam_ref = [ser_16qam_ref.get(ebno, float('nan')) for ebno in ebno_dbs]
 # ============================================================================================ #
 # Plot: BER e SER
 # ============================================================================================ #
-markers = ['o', 's', '^', 'D']
-colors  = ['#e63946', '#457b9d', '#2a9d8f', '#e9c46a']
+markers = ['o', 's', '^', 'D', 'x']
+colors  = ['#e63946', '#457b9d', '#2a9d8f', '#e9c46a', '#3d405b']
 
 fig, axes = plt.subplots(1, 2, figsize=(13, 5))
 
