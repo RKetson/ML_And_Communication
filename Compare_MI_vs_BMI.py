@@ -150,6 +150,7 @@ markers = {'BMI': 'o', 'MI': 's'}
 colors  = {'BMI': '#e63946', 'MI': '#457b9d'}
 
 fig, axes = plt.subplots(1, 2, figsize=(13, 5))
+fig.suptitle(f'Comparação de Desempenho: Autoencoder MI vs BMI ({2**k}-QAM)', fontsize=16, fontweight='bold')
 
 for ax, metric_idx, ylabel, title in [
     (axes[0], 0, 'BER', 'Bit Error Rate — MI vs BMI Autoencoder'),

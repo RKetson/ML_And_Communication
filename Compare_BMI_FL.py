@@ -140,6 +140,7 @@ markers = ['o', 's', '^', 'D', 'x']
 colors  = ['#e63946', '#457b9d', '#2a9d8f', '#e9c46a', '#3d405b']
 
 fig, axes = plt.subplots(1, 2, figsize=(13, 5))
+fig.suptitle(f'Autoencoder BMI (Bit-wise) vs {2**k}-QAM Não Codificado', fontsize=16, fontweight='bold')
 
 for ax, metric_idx, ylabel, title in [
     (axes[0], 0, 'BER', 'Bit Error Rate — BMI Autoencoder vs 16-QAM'),
