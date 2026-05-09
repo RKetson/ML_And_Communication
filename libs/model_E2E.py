@@ -188,9 +188,11 @@ class End2EndSystem(tf.keras.Model):
             return self.bce(bits_float, logits) if self.bit_wise else self.bce(one_hot, logits)
         else:
             if self.bit_wise:
-                return bits, tf.cast(tf.math.greater_equal(logits, 0.0), tf.int32)
+                sigmoid = tf.nn.sigmoid(logits)
+                return bits, tf.cast(tf.math.greater_equal(sigmoid, 0.5), tf.int32)
             else:
-                return bits, self.indices_to_bits(tf.math.argmax(logits, axis=-1))
+                softmax = tf.nn.softmax(logits)
+                return bits, self.indices_to_bits(tf.math.argmax(softmax, axis=-1))
 
     # ---------------------------------------------------------------------- #
     # Visualização — mantida fora do grafo XLA intencionalmente               #

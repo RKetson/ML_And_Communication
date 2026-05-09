@@ -1,3 +1,5 @@
+from IPython.core import display_functions
+from IPython.core import display_functions
 from libs.model_E2E import EnergyNormalization
 import tensorflow as tf
 from collections import namedtuple
@@ -59,9 +61,9 @@ class Receiver_FL(Layer): # Inherits from Keras Layer
 
         if self.bit_wise:
             self.dense_1 = Dense(M, 'relu')
-            self.dense_2 = Dense(k, 'sigmoid')
+            self.dense_2 = Dense(k, activation=None)
         else:
-            self.dense_2 = Dense(M, 'softmax')
+            self.dense_2 = Dense(M, activation=None)
 
     def call(self, y):
         z = self.dense_0(y)
@@ -148,9 +150,9 @@ class Receiver(Layer): # Inherits from Keras Layer
         self.flatten = Flatten()
         if self.bit_wise:
             self.dense_0 = Dense(2**k, 'relu')
-            self.dense_1 = Dense(k, 'sigmoid')
+            self.dense_1 = Dense(k, activation=None)
         else:
-            self.dense_1 = Dense(2**k, 'softmax')
+            self.dense_1 = Dense(2**k, activation=None)
 
     def call(self, y):
         """
@@ -259,7 +261,7 @@ class Receiver_BMI(Layer):
         super().__init__()
         hidden_size = 2 ** (k + a)
         self.dense_hidden = Dense(hidden_size, activation='relu')
-        self.dense_output = Dense(k, activation='linear')   # logits / LLRs
+        self.dense_output = Dense(k, activation=None)
 
     def call(self, y):
         """
@@ -325,7 +327,7 @@ class Receiver_MI(Layer):
         M = 2 ** k
         hidden_size = 2 ** (k + a)
         self.dense_hidden = Dense(hidden_size, activation='relu')
-        self.dense_output = Dense(M, activation='softmax')   # Probabilidades
+        self.dense_output = Dense(M, activation=None)
 
     def call(self, y):
         """
