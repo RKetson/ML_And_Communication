@@ -349,3 +349,130 @@ Net_MI = __Net_MI(Transmitter_BMI, Receiver_MI)
 Net_MI.transmitter.__doc__ = Transmitter_BMI.__doc__
 Net_MI.receiver.__doc__ = Receiver_MI.__doc__
 # =============================================================================== #
+
+
+"""
+    Net_Coded:
+
+    Arquitetura para aprendizado de código linear (codificação + decodificação).
+
+    A arquitetura possui:
+        - Um codificador neural treinável.
+        - Um módulo de canal AWGN simulado (efeito de ruído adicionado).
+        - Um decodificador neural treinável.
+
+    Transmissor (Codificador):
+        Entrada: k bits (vetor one-hot de tamanho M=2^k).
+        Saída:   n bits (vetor binário de comprimento n).
+
+    Receptor (Decodificador):
+        Entrada: n bits ruidosos.
+        Saída:   k logits (um par de LLRs por bit de informação).
+
+    O sistema é treinado de ponta a ponta (End2End) para minimizar o BER/SER
+    do código aprendido.
+"""
+
+################
+## ENCODER (TRANSIMITTER) ##
+################
+
+class Encoder_Coded(Layer):
+    """
+    Codificador neural treinável para aprendizado de código linear.
+
+    Entrada:  k bits (vetor one-hot de tamanho M=2^k).
+    Saída:    n bits (vetor binário de comprimento n).
+
+    O codificador aprende uma função que mapeia palavras-código em vetores
+    de comprimento n sobre o campo binário GF(2).
+    """
+
+    def __init__(self, k, n):
+        super().__init__()
+        M = 2 ** k
+        self.k = k
+        self.n = n
+
+        # Camada de constelação: one-hot → ponto real
+        # M neurônios → n dimensões (espaço de símbolos)
+        self.constellation = Dense(n, activation='linear', use_bias=False)
+        self.energy_norm = EnergyNormalization()
+
+    def call(self, one_hot):
+        """
+        Entrada: Tensor one-hot de tamanho (batch, M=2^k).
+        Saída:   Tensor de símbolos de tamanho (batch, n).
+        """
+        z = self.constellation(one_hot)
+        z = self.energy_norm(z)
+        return z
+
+
+################
+## DECODER (RECEIVER) ##
+################
+
+class Decoder_Coded(Layer):
+    """
+    Decodificador neural treinável para aprendizado de código linear.
+
+    Recebe n bits ruidosos e produz k logits (LLRs).
+    A arquitetura é inspirada no Viterbi/LSTM para processamento sequencial,
+    mas adaptada para decodificação de códigos block.
+
+    Entradas:
+        k: Número de bits de informação por símbolo.
+        n: Comprimento do codeword (n ≥ k).
+        a: Expoente de capacidade.
+        bmi: Se True, o receptor produz k logits (BMI).
+             Se False, o receptor produz M probabilidades (MI).
+    """
+
+    def __init__(self, k, n, a=0, bmi=False):
+        super().__init__()
+        self.k = k
+        self.n = n
+        self.a = a
+        self.bmi = bmi
+
+        hidden_size = 2 ** (k + a)  # 2M neurônios
+
+        # Camada densa para processar os n bits de entrada
+        self.dense_input = Dense(hidden_size, activation='relu')
+
+        # Camada oculta com capacidade suficiente para aprender o código
+        self.dense_hidden = Dense(hidden_size, activation='relu')
+
+        if self.bmi:
+            self.dense_output = Dense(k, activation=None)
+        else:
+            self.dense_output = Dense(2 ** k, activation=None)
+
+    def call(self, y):
+        """
+        Entrada: Tensor dos símbolos ruidosos de tamanho (batch, n).
+        Saída:   Tensor de logits de tamanho (batch, k) ou (batch, 2**k).
+        """
+        z = self.dense_input(y)
+        z = self.dense_hidden(z)
+        z = self.dense_output(z)
+        return z
+
+
+__Net_Coded = namedtuple('Net_Coded', ['encoder', 'decoder'])
+
+Net_Coded = __Net_Coded(Encoder_Coded, Decoder_Coded)
+"""
+    Net_Coded:
+
+    Transmissor (Encoder) → Canal AWGN → Receptor (Decoder).
+
+    Uso:
+        encoder = Net_Coded.encoder(k, n)
+        decoder = Net_Coded.decoder(k, n)
+        system = End2EndSystem(k, n, encoder, decoder, channel_awgn=True)
+"""
+Net_Coded.encoder.__doc__ = Encoder_Coded.__doc__
+Net_Coded.decoder.__doc__ = Decoder_Coded.__doc__
+# =============================================================================== # 
