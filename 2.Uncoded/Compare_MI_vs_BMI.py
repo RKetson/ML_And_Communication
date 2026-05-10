@@ -5,8 +5,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import tensorflow as tf
 
+
 from libs.val_model import train, recover_weights, aval_model, recover_points_model
-from libs.topology import Net_Coded
+from libs.topology import Net_BMI, Net_MI
 from libs.model_E2E import End2EndSystem
 from libs.AFF3CT_to_points import txt_to_dict
 
@@ -16,8 +17,8 @@ from libs.AFF3CT_to_points import txt_to_dict
     capacidade (parâmetro 'a') encontrada para cada rede.
 
     Uso:
-        python Compare_MI_vs_BMI_coded.py           # Carrega resultados salvos
-        python Compare_MI_vs_BMI_coded.py --retrain # Força novo treinamento
+        python Compare_MI_vs_BMI.py           # Carrega resultados salvos
+        python Compare_MI_vs_BMI.py --retrain # Força novo treinamento
 """
 
 # ============================================================================================ #
@@ -50,13 +51,13 @@ BATCH_SIZE           = 25000
 NUM_TRAINING_ITER    = 8000
 
 k           = 4          # Bits de informação por símbolo
-n           = 7          # Dimensões reais do símbolo transmitido (I e Q)
-SNRdb_train = 5.0        # SNR de treinamento (dB)
-ebno_dbs    = np.arange(-4, 8, 1)
+n           = 2          # Dimensões reais do símbolo transmitido (I e Q)
+SNRdb_train = 8.0        # SNR de treinamento (dB)
+ebno_dbs    = np.arange(-4, 15, 1)
 
 # Defina aqui os melhores valores de 'a' encontrados nos scripts Compare_BMI_FL.py e Compare_MI_FL.py
 # (Exemplo: se descobrir que a=2 é melhor para BMI e a=3 para MI, modifique estas variáveis)
-BEST_A_BMI = 4
+BEST_A_BMI = 2
 BEST_A_MI  = 2
 
 # ============================================================================================ #
@@ -75,16 +76,16 @@ os.makedirs(FIG_DIR,    exist_ok=True)
 # ============================================================================================ #
 models_info = {
     'BMI': {
-        'net': Net_Coded,
+        'net': Net_BMI,
         'bit_wise': True,
         'a': BEST_A_BMI,
-        'label': f'Bit-wise (a={BEST_A_BMI})'
+        'label': f'Net_BMI (Bit-wise, a={BEST_A_BMI})'
     },
     'MI': {
-        'net': Net_Coded,
+        'net': Net_MI,
         'bit_wise': False,
         'a': BEST_A_MI,
-        'label': f'Symbol-wise (a={BEST_A_MI})'
+        'label': f'Net_MI (Symbol-wise, a={BEST_A_MI})'
     }
 }
 
@@ -104,12 +105,8 @@ for model_name, info in models_info.items():
     is_bit_wise = info['bit_wise']
 
     with strategy.scope():
-        if is_bit_wise:
-            tx = net_topology.encoder(k, n)
-            rx = net_topology.decoder(k, n, a=a, bmi=True)
-        else:
-            tx = net_topology.encoder(k, n)
-            rx = net_topology.decoder(k, n, a=a, bmi=False)
+        tx = net_topology.transmitter(k)
+        rx = net_topology.receiver(k, a=a)
 
         model_train = End2EndSystem(k, n, tx, rx, training=True,  bit_wise=is_bit_wise)
         model_eval  = End2EndSystem(k, n, tx, rx, training=False, bit_wise=is_bit_wise)
@@ -141,15 +138,11 @@ for model_name, info in models_info.items():
     results[model_name] = (ber, ser)
 
 # ============================================================================================ #
-# Referência: Hamming (7,4)
+# Referência: 16-QAM não codificado simulado pelo AFF3CT v4.3.1
 # ============================================================================================ #
-ber_ham_ref, ser_ham_ref = txt_to_dict("./Pontos/AFF3CT/Hamming-7-4.txt")
-ber_ham_ref = [ber_ham_ref.get(ebno, float('nan')) for ebno in ebno_dbs]
-ser_ham_ref = [ser_ham_ref.get(ebno, float('nan')) for ebno in ebno_dbs]
-
-ber_ham_mld, ser_ham_mld = txt_to_dict("./Pontos/AFF3CT/Hamming-7-4-MLD.txt")
-ber_ham_mld = [ber_ham_mld.get(ebno, float('nan')) for ebno in ebno_dbs]
-ser_ham_mld = [ser_ham_mld.get(ebno, float('nan')) for ebno in ebno_dbs]
+ber_16qam_ref, ser_16qam_ref = txt_to_dict("./Pontos/AFF3CT/Uncoded-16QAM.txt")
+ber_16qam_ref = [ber_16qam_ref.get(ebno, float('nan')) for ebno in ebno_dbs]
+ser_16qam_ref = [ser_16qam_ref.get(ebno, float('nan')) for ebno in ebno_dbs]
 
 # ============================================================================================ #
 # Plot: BER e SER
@@ -158,11 +151,11 @@ markers = {'BMI': 'o', 'MI': 's'}
 colors  = {'BMI': '#e63946', 'MI': '#457b9d'}
 
 fig, axes = plt.subplots(1, 2, figsize=(13, 5))
-fig.suptitle(f'Comparação de Desempenho: Autoencoder (7,4) MI vs BMI', fontsize=16, fontweight='bold')
+fig.suptitle(f'Comparação de Desempenho: Autoencoder MI vs BMI ({2**k}-QAM)', fontsize=16, fontweight='bold')
 
 for ax, metric_idx, ylabel, title in [
-    (axes[0], 0, 'BER', 'Bit Error Rate'),
-    (axes[1], 1, 'SER', 'Symbol Error Rate'),
+    (axes[0], 0, 'BER', 'Bit Error Rate — MI vs BMI Autoencoder'),
+    (axes[1], 1, 'SER', 'Symbol Error Rate — MI vs BMI Autoencoder'),
 ]:
     # Curvas dos autoencoders
     for model_name, info in models_info.items():
@@ -172,13 +165,10 @@ for ax, metric_idx, ylabel, title in [
                     marker=markers[model_name], color=colors[model_name], linewidth=1.8, markersize=6,
                     label=info['label'])
 
-    # Referência: Hamming(7,4) não codificado simulado via AFF3CT v4.3.1
-    ref = ber_ham_ref if metric_idx == 0 else ser_ham_ref
+    # Referência: 16-QAM Gray-coded simulado via AFF3CT
+    ref = ber_16qam_ref if metric_idx == 0 else ser_16qam_ref
     ax.semilogy(ebno_dbs, ref, 'k-', linewidth=2.0, marker='x', markersize=7,
-                label='Hamming(7,4) com Hard Decision')
-    ref = ber_ham_mld if metric_idx == 0 else ser_ham_mld
-    ax.semilogy(ebno_dbs, ref, 'k--', linewidth=2.0, marker='x', markersize=7,
-                label='Hamming(7,4) com Soft Decision')
+                label='16-QAM (AFF3CT, referência)')
 
     ax.set_xlabel('Eb/N0 (dB)', fontsize=12)
     ax.set_ylabel(ylabel, fontsize=12)
