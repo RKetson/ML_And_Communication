@@ -177,7 +177,7 @@ plt.title('Symbol Error Rate Comparison')
 plt.legend()
 plt.grid(True)
 
-fig_dir = "./Figures/Fully Connected/Autoencoder-7-4"
+fig_dir = "./Figures/Fully Connected/1.Legado"
 os.makedirs(fig_dir, exist_ok=True)
 
 plt.tight_layout()

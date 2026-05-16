@@ -72,7 +72,7 @@ A_VALUES = [0, 1, 2, 3, 4]
 # ============================================================================================ #
 BUFFER_DIR = "./Buffer/Fully Connected/MI"
 PONTOS_DIR = "./Pontos/Autoencoder/Fully Connected/MI"
-FIG_DIR    = "./Figures/Fully Connected/Autoencoder-MI"
+FIG_DIR    = "./Figures/Fully Connected/3.Autoencoder (7,4)"
 
 os.makedirs(BUFFER_DIR, exist_ok=True)
 os.makedirs(PONTOS_DIR, exist_ok=True)

@@ -65,7 +65,7 @@ BEST_A_MI  = 2
 # ============================================================================================ #
 BUFFER_DIR = "./Buffer/Fully Connected/MI_vs_BMI"
 PONTOS_DIR = "./Pontos/Autoencoder/Fully Connected/MI_vs_BMI"
-FIG_DIR    = "./Figures/Fully Connected/Autoencoder-MI_vs_BMI"
+FIG_DIR    = "./Figures/Fully Connected/2.Uncoded"
 
 os.makedirs(BUFFER_DIR, exist_ok=True)
 os.makedirs(PONTOS_DIR, exist_ok=True)
