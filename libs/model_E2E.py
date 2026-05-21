@@ -30,10 +30,15 @@ class EnergyNormalization(tf.keras.Layer):
         super(EnergyNormalization, self).__init__(**kwargs)
 
     def call(self, input):
+
+        # Centralização no batch
+        input_center = input - tf.reduce_mean(input, axis=0, keepdims=True)
+
         # Energia média por símbolo: média de ||x_i||^2 sobre o batch
-        energy_avg = tf.reduce_mean(tf.reduce_sum(tf.square(input), axis=-1))
+        energy_avg = tf.reduce_mean(tf.reduce_sum(tf.square(input_center), axis=-1))
+        
         # Normaliza para que E_s = 1 (energia média unitária)
-        x_norm = input / tf.sqrt(energy_avg)
+        x_norm = input_center / tf.sqrt(energy_avg)
         return x_norm
 
 
@@ -181,7 +186,7 @@ class End2EndSystem(tf.keras.Model):
         one_hot = tf.one_hot(indices, depth=self.M)
         z       = self.transmitter(one_hot)
         y       = self.add_GaussianNoise(z, ebno_db)
-        logits  = self.receiver(y)
+        logits  = self.receiver(y, training=self.is_training)
 
         if self.is_training:
             bits_float = tf.cast(bits, tf.float32)

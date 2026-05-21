@@ -90,6 +90,76 @@ def train(model_train, snr_dB_Train, optimizer, epochs, batchs, local_weights,
         pickle.dump(weights, f, protocol=pickle.HIGHEST_PROTOCOL)
 
 
+def train_curriculum(model_train, snr_start, snr_end, snr_step, patience, optimizer, epochs, batchs, local_weights,
+                     aval_training=True, steps_for_aval=1000, local_aval="./Buffer/aval_training"):
+    """
+    Função de treinamento com Curriculum Learning (SNR dinâmico baseado em estagnação).
+    """
+    data_const = []
+    current_snr = snr_start
+    snr_tensor = tf.constant(current_snr, dtype=tf.float32)
+    batch_tensor = tf.constant(batchs, dtype=tf.int32)
+    
+    best_loss = float('inf')
+    wait = 0
+    ema_loss = None
+    
+    is_decreasing = snr_start > snr_end
+    
+    for i in range(epochs):
+        loss, grads = _train_step(model_train, batch_tensor, snr_tensor)
+        optimizer.apply_gradients(zip(grads, model_train.trainable_weights))
+        
+        # Atualiza a Média Móvel Exponencial (EMA)
+        current_loss = loss.numpy()
+        if ema_loss is None:
+            ema_loss = current_loss
+        else:
+            ema_loss = 0.99 * ema_loss + 0.01 * current_loss
+            
+        # Verifica estagnação da loss (melhoria de pelo menos 1% relativa à grandeza atual)
+        min_improvement = ema_loss * 0.001
+        if ema_loss < best_loss - min_improvement:
+            best_loss = ema_loss
+            wait = 0
+        else:
+            wait += 1
+            
+        # Se esgotou a paciência
+        if wait >= patience:
+            if is_decreasing and current_snr > snr_end:
+                current_snr -= snr_step
+                current_snr = max(current_snr, snr_end)
+                snr_tensor = tf.constant(current_snr, dtype=tf.float32)
+                wait = 0
+                best_loss = float('inf')  # Reseta o melhor para se readaptar ao novo ruído
+                ema_loss = None
+            elif not is_decreasing and current_snr < snr_end:
+                current_snr += snr_step
+                current_snr = min(current_snr, snr_end)
+                snr_tensor = tf.constant(current_snr, dtype=tf.float32)
+                wait = 0
+                best_loss = float('inf')  # Reseta o melhor para se readaptar ao novo ruído
+                ema_loss = None
+            else:
+                print(f"\nTreinamento concluído antecipadamente (Early Stopping) no SNR final de {current_snr:.1f} dB na iteração {i}.")
+                break
+            
+        if i % 100 == 0:
+            display.clear_output(wait=True)
+            print(f"{i}/{epochs}  SNR: {current_snr:.1f} dB  Loss: {current_loss:.2E} (EMA: {ema_loss:.2E})  Wait: {wait}/{patience}")
+
+        if i % steps_for_aval == 0 and aval_training:
+            x = model_train.points_Constellation()
+            data_const.append(x)
+            with open(local_aval, 'wb') as f:
+                pickle.dump(data_const, f, protocol=pickle.HIGHEST_PROTOCOL)
+
+    weights = model_train.get_weights()
+    with open(local_weights, 'wb') as f:
+        pickle.dump(weights, f, protocol=pickle.HIGHEST_PROTOCOL)
+
+
 def recover_weights(model, local_weights):
     """
     Recupera os pesos treinados de um arquivo e retorna o modelo com os pesos carregados.

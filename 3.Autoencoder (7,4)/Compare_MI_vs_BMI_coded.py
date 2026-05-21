@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 
 
-from libs.val_model import train, recover_weights, aval_model, recover_points_model
+from libs.val_model import train, recover_weights, aval_model, recover_points_model, train_curriculum
 from libs.topology import Net_Coded
 from libs.model_E2E import End2EndSystem
 from libs.AFF3CT_to_points import txt_to_dict
@@ -47,8 +47,8 @@ else:
 # ============================================================================================ #
 # Parâmetros do sistema
 # ============================================================================================ #
-BATCH_SIZE           = 25000
-NUM_TRAINING_ITER    = 8000
+BATCH_SIZE           = 500000
+NUM_TRAINING_ITER    = 150000
 
 k           = 4          # Bits de informação por símbolo
 n           = 7          # Dimensões reais do símbolo transmitido (I e Q)
@@ -119,14 +119,24 @@ for model_name, info in models_info.items():
         lr_schedule = tf.keras.optimizers.schedules.CosineDecay(
             initial_learning_rate=1e-3,
             decay_steps=NUM_TRAINING_ITER,
-            alpha=1e-5   # LR mínima ao final do treino
+            alpha=1e-3   # LR mínima ao final do treino
         )
         optimizer = tf.keras.optimizers.Adam(learning_rate=lr_schedule)
 
         # Treinamento
+        if model_name == "MI":
+            NUM_TRAINING_ITER = 10000
+            BATCH_SIZE = 8000
+            FORCE_RETRAIN = True
+
         if FORCE_RETRAIN or not os.path.exists(local_weights):
-            train(model_train, SNRdb_train, optimizer, NUM_TRAINING_ITER, BATCH_SIZE,
-                local_weights, aval_training=True, steps_for_aval=2500, local_aval=local_aval)
+            if model_name == "BMI":
+                train_curriculum(model_train, snr_start=0.0, snr_end=5.0, snr_step=1.0, patience=3000,
+                                 optimizer=optimizer, epochs=NUM_TRAINING_ITER, batchs=BATCH_SIZE,
+                                 local_weights=local_weights, aval_training=True, steps_for_aval=2500, local_aval=local_aval)
+            else:
+                train(model_train, SNRdb_train, optimizer, NUM_TRAINING_ITER, BATCH_SIZE,
+                    local_weights, aval_training=True, steps_for_aval=2500, local_aval=local_aval)
 
         # Recupera pesos
         model_eval = recover_weights(model_eval, local_weights)

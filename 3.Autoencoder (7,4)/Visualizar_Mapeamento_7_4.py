@@ -14,8 +14,11 @@ k = 4
 n = 7
 M = 2**k
 
-WEIGHTS_DIR_BMI = "./Modelos/Pesos/FullyConnected/BMI"
-WEIGHTS_DIR_MI = "./Modelos/Pesos/FullyConnected/MI"
+#WEIGHTS_DIR_BMI = "./Modelos/Pesos/FullyConnected/BMI"
+#WEIGHTS_DIR_MI = "./Modelos/Pesos/FullyConnected/MI"
+
+WEIGHTS_DIR_BMI = "./Buffer/Fully Connected/MI_vs_BMI"
+WEIGHTS_DIR_MI = "./Buffer/Fully Connected/MI_vs_BMI"
 
 bmi_tx = Net_Coded.encoder(k, n)
 bmi_rx = Net_Coded.decoder(k, n, a=4, bmi=True)
@@ -88,13 +91,30 @@ plt.savefig(f"{out_dir}/Raw_Heatmap_Coded_n7.png")
 plt.close()
 
 # -------------------------------------------------------------------------------------------------
-# 3. Projeção PCA (2D)
+# 3. Projeção t-SNE (2D)
 # -------------------------------------------------------------------------------------------------
-pca_bmi = PCA(n_components=2).fit_transform(symbols_bmi)
-pca_mi = PCA(n_components=2).fit_transform(symbols_mi)
+from sklearn.manifold import TSNE
+
+def normalize_tsne(coords):
+    """
+    Aplica a mesma normalização de energia realizada pela camada EnergyNormalization da rede:
+    Centraliza os pontos e garante que a energia média por símbolo E[||x||^2] seja 1.
+    """
+    center = coords - np.mean(coords, axis=0, keepdims=True)
+    energy_avg = np.mean(np.sum(np.square(center), axis=-1))
+    return center / np.sqrt(energy_avg)
+
+# Para t-SNE com n=16, a perplexidade deve ser menor que 16. Vamos usar 5.
+tsne = TSNE(n_components=2, perplexity=5, random_state=42)
+pca_bmi = tsne.fit_transform(symbols_bmi)
+pca_bmi = normalize_tsne(pca_bmi)
+
+tsne = TSNE(n_components=2, perplexity=5, random_state=42)
+pca_mi = tsne.fit_transform(symbols_mi)
+pca_mi = normalize_tsne(pca_mi)
 
 fig, axes = plt.subplots(1, 2, figsize=(14, 6))
-fig.suptitle('Projeção PCA 2D da Constelação 7D: BMI vs MI', fontsize=16, fontweight='bold')
+fig.suptitle('Projeção t-SNE 2D da Constelação 7D: BMI vs MI', fontsize=16, fontweight='bold')
 
 for ax, pca_symbols, title in zip(axes, [pca_bmi, pca_mi], ['BMI (Bit-wise)', 'MI (Symbol-wise)']):
     ax.scatter(pca_symbols[:, 0], pca_symbols[:, 1], c='b', s=50)
@@ -110,7 +130,7 @@ for ax, pca_symbols, title in zip(axes, [pca_bmi, pca_mi], ['BMI (Bit-wise)', 'M
     ax.set_ylim(-lim_max, lim_max)
 
 plt.tight_layout()
-plt.savefig(f"{out_dir}/PCA_Coded_n7.png")
+plt.savefig(f"{out_dir}/tSNE_Coded_n7.png")
 plt.close()
 
 # -------------------------------------------------------------------------------------------------

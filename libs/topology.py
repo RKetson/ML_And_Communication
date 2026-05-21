@@ -1,3 +1,4 @@
+from tensorflow.python.keras.layers import Dropout
 from IPython.core import display_functions
 from IPython.core import display_functions
 from libs.model_E2E import EnergyNormalization
@@ -65,7 +66,8 @@ class Receiver_FL(Layer): # Inherits from Keras Layer
         else:
             self.dense_2 = Dense(M, activation=None)
 
-    def call(self, y):
+    def call(self, y, training=False):
+
         z = self.dense_0(y)
         if self.bit_wise:
             z = self.dense_1(z)
@@ -154,11 +156,12 @@ class Receiver(Layer): # Inherits from Keras Layer
         else:
             self.dense_1 = Dense(2**k, activation=None)
 
-    def call(self, y):
+    def call(self, y, training=False):
         """
             Entrada: Tensor (, n)
             Saída: Tensor (, M) com logits ou probabilidades
         """
+
         z = self.reshape(y)
         z = self.conv1d1(z)
         z = self.maxpool1(z)
@@ -223,7 +226,7 @@ class Transmitter_BMI(Layer):
         M = 2**k
         # Camada de constelação: one-hot(M) → (I, Q)
         # use_bias=False garante que o ponto de origem (0,0) não seja forçado como símbolo
-        self.constellation = Dense(2, activation='linear', use_bias=False)
+        self.constellation = Dense(2, activation='linear', use_bias=True)
         self.normalization = EnergyNormalization()
 
     def call(self, one_hot):
@@ -263,11 +266,12 @@ class Receiver_BMI(Layer):
         self.dense_hidden = Dense(hidden_size, activation='relu')
         self.dense_output = Dense(k, activation=None)
 
-    def call(self, y):
+    def call(self, y, training=False):
         """
         Entrada: Tensor do sinal recebido de tamanho (batch, 2).
         Saída:   Tensor de logits de tamanho (batch, k).
         """
+
         z = self.dense_hidden(y)
         z = self.dense_output(z)
         return z
@@ -329,11 +333,12 @@ class Receiver_MI(Layer):
         self.dense_hidden = Dense(hidden_size, activation='relu')
         self.dense_output = Dense(M, activation=None)
 
-    def call(self, y):
+    def call(self, y, training=False):
         """
         Entrada: Tensor do sinal recebido de tamanho (batch, 2).
         Saída:   Tensor de probabilidades de tamanho (batch, M).
         """
+
         z = self.dense_hidden(y)
         z = self.dense_output(z)
         return z
@@ -396,6 +401,7 @@ class Encoder_Coded(Layer):
 
         # Camada de constelação: one-hot → ponto real
         # M neurônios → n dimensões (espaço de símbolos)
+        self.hidden_constellation = Dense(M, activation='relu', use_bias=False)
         self.constellation = Dense(n, activation='linear', use_bias=False)
         self.energy_norm = EnergyNormalization()
 
@@ -404,7 +410,8 @@ class Encoder_Coded(Layer):
         Entrada: Tensor one-hot de tamanho (batch, M=2^k).
         Saída:   Tensor de símbolos de tamanho (batch, n).
         """
-        z = self.constellation(one_hot)
+        z = self.hidden_constellation(one_hot)
+        z = self.constellation(z)
         z = self.energy_norm(z)
         return z
 
@@ -440,22 +447,27 @@ class Decoder_Coded(Layer):
 
         # Camada densa para processar os n bits de entrada
         self.dense_input = Dense(hidden_size, activation='relu')
+        self.dropout_1 = Dropout(0.2)
 
         # Camada oculta com capacidade suficiente para aprender o código
         self.dense_hidden = Dense(hidden_size, activation='relu')
+        self.dropout_2 = Dropout(0.2)
 
         if self.bmi:
             self.dense_output = Dense(k, activation=None)
         else:
             self.dense_output = Dense(2 ** k, activation=None)
 
-    def call(self, y):
+    def call(self, y, training=False):
         """
         Entrada: Tensor dos símbolos ruidosos de tamanho (batch, n).
         Saída:   Tensor de logits de tamanho (batch, k) ou (batch, 2**k).
         """
+
         z = self.dense_input(y)
+        z = self.dropout_1(z, training=training)
         z = self.dense_hidden(z)
+        z = self.dropout_2(z, training=training)
         z = self.dense_output(z)
         return z
 
