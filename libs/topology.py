@@ -226,7 +226,7 @@ class Transmitter_BMI(Layer):
         M = 2**k
         # Camada de constelação: one-hot(M) → (I, Q)
         # use_bias=False garante que o ponto de origem (0,0) não seja forçado como símbolo
-        self.constellation = Dense(2, activation='linear', use_bias=True)
+        self.constellation = Dense(2, activation='linear', use_bias=False)
         self.normalization = EnergyNormalization()
 
     def call(self, one_hot):

@@ -159,7 +159,8 @@ plt.close()
 
 # 3. t-SNE Normalizado
 def normalize_tsne(coords):
-    center = coords - np.mean(coords, axis=0, keepdims=True)
+    #center = coords - np.mean(coords, axis=0, keepdims=True)
+    center = coords
     energy_avg = np.mean(np.sum(np.square(center), axis=-1))
     return center / np.sqrt(energy_avg)
 

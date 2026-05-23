@@ -96,7 +96,8 @@ def normalize_tsne(coords):
     Aplica a mesma normalização de energia realizada pela camada EnergyNormalization da rede:
     Centraliza os pontos e garante que a energia média por símbolo E[||x||^2] seja 1.
     """
-    center = coords - np.mean(coords, axis=0, keepdims=True)
+    #center = coords - np.mean(coords, axis=0, keepdims=True)
+    center = coords
     energy_avg = np.mean(np.sum(np.square(center), axis=-1))
     return center / np.sqrt(energy_avg)
 

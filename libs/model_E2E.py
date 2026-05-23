@@ -32,8 +32,9 @@ class EnergyNormalization(tf.keras.Layer):
     def call(self, input):
 
         # Centralização no batch
-        input_center = input - tf.reduce_mean(input, axis=0, keepdims=True)
+        #input_center = input - tf.reduce_mean(input, axis=0, keepdims=True)
 
+        input_center = input
         # Energia média por símbolo: média de ||x_i||^2 sobre o batch
         energy_avg = tf.reduce_mean(tf.reduce_sum(tf.square(input_center), axis=-1))
         
