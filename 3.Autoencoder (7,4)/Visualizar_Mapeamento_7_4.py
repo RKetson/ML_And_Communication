@@ -8,17 +8,13 @@ from libs.val_model import recover_weights
 from libs.topology import Net_Coded
 from libs.model_E2E import End2EndSystem
 from scipy.spatial.distance import cdist
-from sklearn.decomposition import PCA
 
 k = 4
 n = 7
 M = 2**k
 
-#WEIGHTS_DIR_BMI = "./Modelos/Pesos/FullyConnected/BMI"
-#WEIGHTS_DIR_MI = "./Modelos/Pesos/FullyConnected/MI"
-
-WEIGHTS_DIR_BMI = "./Buffer/Fully Connected/MI_vs_BMI"
-WEIGHTS_DIR_MI = "./Buffer/Fully Connected/MI_vs_BMI"
+WEIGHTS_DIR_BMI = "./Modelos/Pesos/FullyConnected/BMI"
+WEIGHTS_DIR_MI = "./Modelos/Pesos/FullyConnected/MI"
 
 bmi_tx = Net_Coded.encoder(k, n)
 bmi_rx = Net_Coded.decoder(k, n, a=4, bmi=True)
