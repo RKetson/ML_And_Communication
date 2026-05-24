@@ -6,8 +6,8 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 
 
-from libs.val_model import train, recover_weights, aval_model, recover_points_model
-from libs.topology import Net_BMI, Net_MI
+from libs.val_model import recover_weights, aval_model, recover_points_model, train_curriculum
+from libs.topology import Net_Coded
 from libs.model_E2E import End2EndSystem
 from libs.AFF3CT_to_points import txt_to_dict
 
@@ -48,12 +48,12 @@ else:
 # Parâmetros do sistema
 # ============================================================================================ #
 BATCH_SIZE           = 25000
-NUM_TRAINING_ITER    = 8000
+NUM_TRAINING_ITER    = 250000
 
 k           = 4          # Bits de informação por símbolo
 n           = 2          # Dimensões reais do símbolo transmitido (I e Q)
 SNRdb_train = 8.0        # SNR de treinamento (dB)
-ebno_dbs    = np.arange(-4, 15, 1)
+ebno_dbs    = np.arange(-4, 14, 1)
 
 # Defina aqui os melhores valores de 'a' encontrados nos scripts Compare_BMI_FL.py e Compare_MI_FL.py
 # (Exemplo: se descobrir que a=2 é melhor para BMI e a=3 para MI, modifique estas variáveis)
@@ -76,13 +76,13 @@ os.makedirs(FIG_DIR,    exist_ok=True)
 # ============================================================================================ #
 models_info = {
     'BMI': {
-        'net': Net_BMI,
+        'net': Net_Coded,
         'bit_wise': True,
         'a': BEST_A_BMI,
         'label': f'Net_BMI (Bit-wise, a={BEST_A_BMI})'
     },
     'MI': {
-        'net': Net_MI,
+        'net': Net_Coded,
         'bit_wise': False,
         'a': BEST_A_MI,
         'label': f'Net_MI (Symbol-wise, a={BEST_A_MI})'
@@ -105,8 +105,8 @@ for model_name, info in models_info.items():
     is_bit_wise = info['bit_wise']
 
     with strategy.scope():
-        tx = net_topology.transmitter(k)
-        rx = net_topology.receiver(k, a=a)
+        tx = net_topology.encoder(k, n)
+        rx = net_topology.decoder(k, n, a, bmi=is_bit_wise)
 
         model_train = End2EndSystem(k, n, tx, rx, training=True,  bit_wise=is_bit_wise)
         model_eval  = End2EndSystem(k, n, tx, rx, training=False, bit_wise=is_bit_wise)
@@ -115,21 +115,23 @@ for model_name, info in models_info.items():
         lr_schedule = tf.keras.optimizers.schedules.CosineDecay(
             initial_learning_rate=1e-3,
             decay_steps=NUM_TRAINING_ITER,
-            alpha=1e-5   # LR mínima ao final do treino
+            alpha=1e-3   # LR mínima ao final do treino
         )
         optimizer = tf.keras.optimizers.Adam(learning_rate=lr_schedule)
 
         # Treinamento
         if FORCE_RETRAIN or not os.path.exists(local_weights):
-            train(model_train, SNRdb_train, optimizer, NUM_TRAINING_ITER, BATCH_SIZE,
-                local_weights, aval_training=True, steps_for_aval=2500, local_aval=local_aval)
+            train_curriculum(model_train, snr_start=0.0, snr_end=8.0, snr_step=2.0, patience=5000,
+                             optimizer=optimizer, epochs=NUM_TRAINING_ITER, batchs=BATCH_SIZE,
+                             local_weights=local_weights, aval_training=True, steps_for_aval=2500, local_aval=local_aval)
+            #    local_weights, aval_training=True, steps_for_aval=2500, local_aval=local_aval)
 
         # Recupera pesos
         model_eval = recover_weights(model_eval, local_weights)
 
     # Avaliação Monte Carlo
     if FORCE_RETRAIN or not os.path.exists(local_ber_ser):
-        aval_model(model_eval, ebno_dbs, max_iter=750000, block_errors=500,
+        aval_model(model_eval, ebno_dbs, max_iter=150000, block_errors=1000,
                    graph_mode="xla", local=local_ber_ser)
 
     ber_dict, ser_dict = recover_points_model(local_ber_ser)

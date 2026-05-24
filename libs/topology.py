@@ -263,7 +263,8 @@ class Receiver_BMI(Layer):
     def __init__(self, k, a=0):
         super().__init__()
         hidden_size = 2 ** (k + a)
-        self.dense_hidden = Dense(hidden_size, activation='relu')
+        self.dense_hidden1 = Dense(hidden_size, activation='relu')
+        self.dense_hidden2 = Dense(hidden_size, activation='relu')
         self.dense_output = Dense(k, activation=None)
 
     def call(self, y, training=False):
@@ -272,7 +273,8 @@ class Receiver_BMI(Layer):
         Saída:   Tensor de logits de tamanho (batch, k).
         """
 
-        z = self.dense_hidden(y)
+        z = self.dense_hidden1(y)
+        z = self.dense_hidden2(z)
         z = self.dense_output(z)
         return z
 

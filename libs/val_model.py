@@ -117,8 +117,8 @@ def train_curriculum(model_train, snr_start, snr_end, snr_step, patience, optimi
         else:
             ema_loss = 0.99 * ema_loss + 0.01 * current_loss
             
-        # Verifica estagnação da loss (melhoria de pelo menos 1% relativa à grandeza atual)
-        min_improvement = ema_loss * 0.001
+        # Verifica estagnação da loss (melhoria de pelo menos 0.1% relativa à grandeza atual)
+        min_improvement = ema_loss * 0.0001
         if ema_loss < best_loss - min_improvement:
             best_loss = ema_loss
             wait = 0

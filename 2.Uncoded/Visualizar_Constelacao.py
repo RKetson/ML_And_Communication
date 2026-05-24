@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import tensorflow as tf
 from libs.val_model import recover_weights
-from libs.topology import Net_BMI, Net_MI
+from libs.topology import Net_Coded
 from libs.model_E2E import End2EndSystem
 from scipy.spatial.distance import cdist
 
@@ -17,14 +17,14 @@ WEIGHTS_DIR_BMI = "./Modelos/Pesos/FullyConnected/BMI"
 WEIGHTS_DIR_MI = "./Modelos/Pesos/FullyConnected/MI"
 
 # Modelos (a=2 para ambos)
-bmi_tx = Net_BMI.transmitter(k)
-bmi_rx = Net_BMI.receiver(k, a=2)
+bmi_tx = Net_Coded.encoder(k, n)
+bmi_rx = Net_Coded.decoder(k, n, a=2, bmi=True)
 model_bmi = End2EndSystem(k, n, bmi_tx, bmi_rx, training=False, bit_wise=True)
 _ = model_bmi(1, 10.0)
 model_bmi = recover_weights(model_bmi, f"{WEIGHTS_DIR_BMI}/weights-BMI-k4-n2-a2")
 
-mi_tx = Net_MI.transmitter(k)
-mi_rx = Net_MI.receiver(k, a=2)
+mi_tx = Net_Coded.encoder(k, n)
+mi_rx = Net_Coded.decoder(k, n, a=2, bmi=False)
 model_mi = End2EndSystem(k, n, mi_tx, mi_rx, training=False, bit_wise=False)
 _ = model_mi(1, 10.0)
 model_mi = recover_weights(model_mi, f"{WEIGHTS_DIR_MI}/weights-MI-k4-n2-a2")
