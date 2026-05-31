@@ -47,7 +47,7 @@ else:
 # ============================================================================================ #
 # Parâmetros do sistema
 # ============================================================================================ #
-BATCH_SIZE           = 50000
+BATCH_SIZE           = 5000
 NUM_TRAINING_ITER    = 150000
 
 k           = 4          # Bits de informação por símbolo
@@ -62,11 +62,11 @@ BEST_A_MI  = 2
 # ============================================================================================ #
 # Diretórios de saída
 # ============================================================================================ #
-BUFFER_DIR = "./Buffer/Fully Connected/MI_vs_BMI"
+MODELS_DIR = "./Modelos/Pesos/FullyConnected"
 PONTOS_DIR = "./Pontos/Autoencoder/Fully Connected/MI_vs_BMI"
 FIG_DIR    = "./Figures/Fully Connected/3.Autoencoder (7,4)"
 
-os.makedirs(BUFFER_DIR, exist_ok=True)
+os.makedirs(MODELS_DIR, exist_ok=True)
 os.makedirs(PONTOS_DIR, exist_ok=True)
 os.makedirs(FIG_DIR,    exist_ok=True)
 
@@ -96,8 +96,8 @@ for model_name, info in models_info.items():
     print(f" Treinando/Avaliando — {info['label']}")
     print(f"{'='*60}")
 
-    local_weights = f"{BUFFER_DIR}/weights-{model_name}-k{k}-n{n}-a{a}"
-    local_aval    = f"{BUFFER_DIR}/constellation-{model_name}-k{k}-n{n}-a{a}"
+    local_weights = f"{MODELS_DIR}/{model_name}/weights-{model_name}-k{k}-n{n}-a{a}"
+    local_aval    = f"{MODELS_DIR}/{model_name}/constellation-{model_name}-k{k}-n{n}-a{a}"
     local_ber_ser = f"{PONTOS_DIR}/BER_SER-{model_name}-k{k}-n{n}-a{a}"
 
     net_topology = info['net']
@@ -125,8 +125,12 @@ for model_name, info in models_info.items():
         # Treinamento
         if FORCE_RETRAIN or not os.path.exists(local_weights):
             train_curriculum(model_train, snr_start=0.0, snr_end=5.0, snr_step=1.0, patience=3000,
-                             optimizer=optimizer, epochs=NUM_TRAINING_ITER, batchs=BATCH_SIZE,
-                             local_weights=local_weights, aval_training=True, steps_for_aval=2500, local_aval=local_aval)
+                             optimizer=optimizer, epochs=NUM_TRAINING_ITER, batchs=BATCH_SIZE, steps_per_epoch=10,
+                             local_weights=local_weights, aval_training=True, steps_for_aval=2500, local_aval=local_aval,
+                             generate_gif=True,
+                             gif_path=f"{FIG_DIR}/gif_training_evolution_{model_name}_n{n}_a{a}.gif",
+                             gif_title=f'Projeção 2D: Autoencoder (7,4) {model_name} (a={a})'
+                             )
 
         # Recupera pesos
         model_eval = recover_weights(model_eval, local_weights)

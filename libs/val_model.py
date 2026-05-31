@@ -1,4 +1,6 @@
+import os
 import pickle
+import numpy as np
 import tensorflow as tf
 from IPython import display
 from sionna.phy.utils import sim_ber
@@ -44,7 +46,9 @@ def _train_step(model_train, batch_tensor, snr_tensor):
 
 
 def train(model_train, snr_dB_Train, optimizer, epochs, batchs, local_weights,
-          aval_training=True, steps_for_aval=1000, local_aval="./Buffer/aval_training"):
+          aval_training=True, steps_for_aval=1000, local_aval="./Buffer/aval_training",
+          generate_gif=False, gif_path="./Figures/training_evolution.gif",
+          gif_title="Evolução da Constelação", steps_per_epoch=1):
     """
     Função para treinamento do modelo.
 
@@ -68,19 +72,25 @@ def train(model_train, snr_dB_Train, optimizer, epochs, batchs, local_weights,
     batch_tensor = tf.constant(batchs, dtype=tf.int32)
 
     for i in range(epochs):
+        epoch_loss = 0.0
         # _train_step: forward + gradientes num único grafo compilado (@tf.function)
         # apply_gradients fora para compatibilidade com MirroredStrategy (AllReduce)
-        loss, grads = _train_step(model_train, batch_tensor, snr_tensor)
-        optimizer.apply_gradients(zip(grads, model_train.trainable_weights))
+        for _ in range(steps_per_epoch):
+            loss, grads = _train_step(model_train, batch_tensor, snr_tensor)
+            optimizer.apply_gradients(zip(grads, model_train.trainable_weights))
+            epoch_loss += loss.numpy()
+            
+        current_loss = epoch_loss / steps_per_epoch
 
         # Progresso e snapshot de constelação (apenas a cada 100 iterações)
         if i % 100 == 0:
             display.clear_output(wait=True)
-            print(f"{i}/{epochs}  Loss: {loss:.2E}")
+            print(f"{i}/{epochs}  Loss: {current_loss:.2E}")
 
             if i % steps_for_aval == 0 and aval_training:
                 x = model_train.points_Constellation()
-                data_const.append(x)
+                data_const.append({'snr': snr_dB_Train, 'points': x})
+                os.makedirs(os.path.dirname(local_aval), exist_ok=True)
                 with open(local_aval, 'wb') as f:
                     pickle.dump(data_const, f, protocol=pickle.HIGHEST_PROTOCOL)
 
@@ -89,9 +99,14 @@ def train(model_train, snr_dB_Train, optimizer, epochs, batchs, local_weights,
     with open(local_weights, 'wb') as f:
         pickle.dump(weights, f, protocol=pickle.HIGHEST_PROTOCOL)
 
+    if aval_training and generate_gif:
+        generate_training_gif(local_aval, gif_path, title=gif_title)
+
 
 def train_curriculum(model_train, snr_start, snr_end, snr_step, patience, optimizer, epochs, batchs, local_weights,
-                     aval_training=True, steps_for_aval=1000, local_aval="./Buffer/aval_training"):
+                     aval_training=True, steps_for_aval=1000, local_aval="./Buffer/aval_training",
+                     generate_gif=False, gif_path="./Figures/training_evolution.gif",
+                     gif_title="Evolução da Constelação", steps_per_epoch=1):
     """
     Função de treinamento com Curriculum Learning (SNR dinâmico baseado em estagnação).
     """
@@ -107,11 +122,15 @@ def train_curriculum(model_train, snr_start, snr_end, snr_step, patience, optimi
     is_decreasing = snr_start > snr_end
     
     for i in range(epochs):
-        loss, grads = _train_step(model_train, batch_tensor, snr_tensor)
-        optimizer.apply_gradients(zip(grads, model_train.trainable_weights))
+        epoch_loss = 0.0
+        for _ in range(steps_per_epoch):
+            loss, grads = _train_step(model_train, batch_tensor, snr_tensor)
+            optimizer.apply_gradients(zip(grads, model_train.trainable_weights))
+            epoch_loss += loss.numpy()
+            
+        current_loss = epoch_loss / steps_per_epoch
         
         # Atualiza a Média Móvel Exponencial (EMA)
-        current_loss = loss.numpy()
         if ema_loss is None:
             ema_loss = current_loss
         else:
@@ -151,13 +170,151 @@ def train_curriculum(model_train, snr_start, snr_end, snr_step, patience, optimi
 
         if i % steps_for_aval == 0 and aval_training:
             x = model_train.points_Constellation()
-            data_const.append(x)
+            data_const.append({'snr': current_snr, 'points': x})
+            os.makedirs(os.path.dirname(local_aval), exist_ok=True)
             with open(local_aval, 'wb') as f:
                 pickle.dump(data_const, f, protocol=pickle.HIGHEST_PROTOCOL)
 
     weights = model_train.get_weights()
     with open(local_weights, 'wb') as f:
         pickle.dump(weights, f, protocol=pickle.HIGHEST_PROTOCOL)
+
+    if aval_training and generate_gif:
+        generate_training_gif(local_aval, gif_path, title=gif_title)
+
+
+def generate_training_gif(local_aval, gif_path, title="Evolução da Constelação"):
+    """
+    Gera um GIF animado a partir do histórico de constelações salvo durante o treinamento.
+    Se a dimensionalidade for maior que 2, utiliza PCA para reduzir para 2D.
+    """
+    import io
+    import matplotlib.pyplot as plt
+    import numpy as np
+    from PIL import Image
+    from sklearn.manifold import TSNE
+
+    if not os.path.exists(local_aval):
+        print(f"Arquivo de histórico {local_aval} não encontrado. O GIF não será gerado.")
+        return
+
+    with open(local_aval, 'rb') as f:
+        data_const = pickle.load(f)
+
+    if len(data_const) == 0:
+        print("Histórico vazio. O GIF não será gerado.")
+        return
+
+    # Garante que o diretório de destino existe
+    os.makedirs(os.path.dirname(gif_path), exist_ok=True)
+
+    frames = []
+    
+    # Extrai o último frame para entender a dimensionalidade
+    last_frame = data_const[-1]
+    
+    if isinstance(last_frame, dict):
+        last_frame_points = last_frame.get('points')
+    else:
+        last_frame_points = last_frame
+
+    if isinstance(last_frame_points, tuple) and len(last_frame_points) == 2:
+        _, last_z = last_frame_points
+    else:
+        last_z = last_frame_points
+
+    if isinstance(last_z, tf.Tensor):
+        last_z_np = last_z.numpy()
+    else:
+        last_z_np = last_z
+
+    n_dims = last_z_np.shape[-1]
+    
+    def normalize_tsne(coords):
+        energy_avg = np.mean(np.sum(np.square(coords), axis=-1))
+        return coords / np.sqrt(energy_avg)
+
+    if n_dims > 2:
+        perplexity = min(5, len(last_z_np) - 1)
+        tsne_model = TSNE(n_components=2, perplexity=perplexity, random_state=42, init='pca')
+        last_z_plot = tsne_model.fit_transform(last_z_np)
+        last_z_plot = normalize_tsne(last_z_plot)
+    else:
+        last_z_plot = last_z_np
+        
+    lim_max = np.max(np.abs(last_z_plot)) + 0.5
+        
+    for idx, frame_data in enumerate(data_const):
+        if isinstance(frame_data, dict):
+            snr = frame_data.get('snr')
+            points_data = frame_data.get('points')
+        else:
+            snr = None
+            points_data = frame_data
+
+        if isinstance(points_data, tuple) and len(points_data) == 2:
+            bits, z = points_data
+        else:
+            bits, z = None, points_data
+            
+        if isinstance(z, tf.Tensor):
+            z_np = z.numpy()
+        else:
+            z_np = z
+            
+        if bits is not None:
+            if isinstance(bits, tf.Tensor):
+                bits_np = bits.numpy()
+            else:
+                bits_np = bits
+            labels_binarios_str = ["".join(str(int(bit)) for bit in row) for row in bits_np]
+        else:
+            k_val = int(np.log2(len(z_np)))
+            labels_binarios_str = [f"{i:0{k_val}b}" for i in range(len(z_np))]
+            
+        if n_dims > 2:
+            tsne_model = TSNE(n_components=2, perplexity=perplexity, random_state=42, init='pca')
+            z_plot = tsne_model.fit_transform(z_np)
+            z_plot = normalize_tsne(z_plot)
+        else:
+            z_plot = z_np
+
+        fig, ax = plt.subplots(figsize=(7, 7))
+        ax.scatter(z_plot[:, 0], z_plot[:, 1], c='b')
+        
+        for i, point in enumerate(z_plot):
+            ax.annotate(labels_binarios_str[i], (point[0], point[1]),
+                        textcoords="offset points", xytext=(5, 5),
+                        ha='center', fontsize=9)
+            
+        title_str = f'{title} - Passo {idx+1}'
+        if snr is not None:
+            title_str += f' (SNR: {snr:.1f} dB)'
+            
+        ax.set_title(title_str)
+        ax.grid(True)
+        ax.set_xlim(-lim_max, lim_max)
+        ax.set_ylim(-lim_max, lim_max)
+        ax.set_aspect('equal', adjustable='box')
+        
+        # Salva em memória
+        buf = io.BytesIO()
+        plt.tight_layout()
+        plt.savefig(buf, format='png')
+        plt.close(fig)
+        buf.seek(0)
+        frames.append(Image.open(buf))
+
+    if frames:
+        frames[0].save(
+            gif_path,
+            format='GIF',
+            append_images=frames[1:],
+            save_all=True,
+            duration=100, 
+            loop=0
+        )
+        print(f"GIF da evolução salvo em: {gif_path}")
 
 
 def recover_weights(model, local_weights):

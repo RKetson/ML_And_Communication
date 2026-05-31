@@ -38,7 +38,7 @@ else:
 # ============================================================================================ #
 # Parâmetros do sistema (BMI)
 # ============================================================================================ #
-BATCH_SIZE           = 500000
+BATCH_SIZE           = 5000
 NUM_TRAINING_ITER    = 150000
 
 k           = 4          
@@ -83,8 +83,11 @@ with strategy.scope():
 
     if FORCE_RETRAIN or not os.path.exists(local_weights):
         train_curriculum(model_train, snr_start=0.0, snr_end=5.0, snr_step=1.0, patience=3000,
-                         optimizer=optimizer, epochs=NUM_TRAINING_ITER, batchs=BATCH_SIZE,
-                         local_weights=local_weights, aval_training=True, steps_for_aval=2500, local_aval=local_aval)
+                         optimizer=optimizer, epochs=NUM_TRAINING_ITER, batchs=BATCH_SIZE, steps_per_epoch=10,
+                         local_weights=local_weights, aval_training=True, steps_for_aval=500, local_aval=local_aval,
+                         generate_gif=True,
+                         gif_path=f"{FIG_DIR}/gif_training_evolution_{model_name}_n{n}_a{a}.gif",
+                         gif_title=f'Projeção 2D: Autoencoder (7,4) BMI (a={a})')
 
     model_eval = recover_weights(model_eval, local_weights)
 
