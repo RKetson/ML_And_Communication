@@ -43,6 +43,19 @@ def _train_step(model_train, batch_tensor, snr_tensor):
     grads = tape.gradient(loss, model_train.trainable_weights)
     return loss, grads
 
+@tf.function
+def _train_epochs_loop(model_train, optimizer, batch_tensor, snr_tensor, steps_per_epoch):
+    """
+    Laço compilado em Graph Mode para iterar os mini-batches inteiramente na GPU.
+    Elimina o gargalo de sincronização CPU/GPU a cada passo.
+    """
+    total_loss = tf.constant(0.0, dtype=tf.float32)
+    for _ in tf.range(steps_per_epoch):
+        loss, grads = _train_step(model_train, batch_tensor, snr_tensor)
+        optimizer.apply_gradients(zip(grads, model_train.trainable_weights))
+        total_loss += loss
+    return total_loss / tf.cast(steps_per_epoch, tf.float32)
+
 
 
 def train(model_train, snr_dB_Train, optimizer, epochs, batchs, local_weights,
@@ -70,17 +83,18 @@ def train(model_train, snr_dB_Train, optimizer, epochs, batchs, local_weights,
     data_const = []
     snr_tensor = tf.constant(snr_dB_Train, dtype=tf.float32)
     batch_tensor = tf.constant(batchs, dtype=tf.int32)
+    steps_tensor = tf.constant(steps_per_epoch, dtype=tf.int32)
+
+    # Constrói o modelo com um forward pass dummy antes de construir o otimizador
+    _ = model_train(batch_tensor, snr_tensor)
+
+    # Constrói as variáveis do otimizador fora do tf.function
+    if not getattr(optimizer, 'built', False):
+        optimizer.build(model_train.trainable_weights)
 
     for i in range(epochs):
-        epoch_loss = 0.0
-        # _train_step: forward + gradientes num único grafo compilado (@tf.function)
-        # apply_gradients fora para compatibilidade com MirroredStrategy (AllReduce)
-        for _ in range(steps_per_epoch):
-            loss, grads = _train_step(model_train, batch_tensor, snr_tensor)
-            optimizer.apply_gradients(zip(grads, model_train.trainable_weights))
-            epoch_loss += loss.numpy()
-            
-        current_loss = epoch_loss / steps_per_epoch
+        # O macro-loop roda inteiramente compilado na GPU para os N passos
+        current_loss = _train_epochs_loop(model_train, optimizer, batch_tensor, snr_tensor, steps_tensor).numpy()
 
         # Progresso e snapshot de constelação (apenas a cada 100 iterações)
         if i % 100 == 0:
@@ -114,6 +128,7 @@ def train_curriculum(model_train, snr_start, snr_end, snr_step, patience, optimi
     current_snr = snr_start
     snr_tensor = tf.constant(current_snr, dtype=tf.float32)
     batch_tensor = tf.constant(batchs, dtype=tf.int32)
+    steps_tensor = tf.constant(steps_per_epoch, dtype=tf.int32)
     
     best_loss = float('inf')
     wait = 0
@@ -121,14 +136,15 @@ def train_curriculum(model_train, snr_start, snr_end, snr_step, patience, optimi
     
     is_decreasing = snr_start > snr_end
     
+    # Constrói o modelo com um forward pass dummy antes de construir o otimizador
+    _ = model_train(batch_tensor, snr_tensor)
+    
+    # Constrói as variáveis do otimizador fora do tf.function
+    if not getattr(optimizer, 'built', False):
+        optimizer.build(model_train.trainable_weights)
+
     for i in range(epochs):
-        epoch_loss = 0.0
-        for _ in range(steps_per_epoch):
-            loss, grads = _train_step(model_train, batch_tensor, snr_tensor)
-            optimizer.apply_gradients(zip(grads, model_train.trainable_weights))
-            epoch_loss += loss.numpy()
-            
-        current_loss = epoch_loss / steps_per_epoch
+        current_loss = _train_epochs_loop(model_train, optimizer, batch_tensor, snr_tensor, steps_tensor).numpy()
         
         # Atualiza a Média Móvel Exponencial (EMA)
         if ema_loss is None:
