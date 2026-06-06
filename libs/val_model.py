@@ -182,7 +182,8 @@ def train_curriculum(model_train, snr_start, snr_end, snr_step, patience, optimi
             
         if i % 100 == 0:
             display.clear_output(wait=True)
-            print(f"{i}/{epochs}  SNR: {current_snr:.1f} dB  Loss: {current_loss:.2E} (EMA: {ema_loss:.2E})  Wait: {wait}/{patience}")
+            ema_str = f"{ema_loss:.2E}" if ema_loss is not None else "N/A"
+            print(f"{i}/{epochs}  SNR: {current_snr:.1f} dB  Loss: {current_loss:.2E} (EMA: {ema_str})  Wait: {wait}/{patience}")
 
         if i % steps_for_aval == 0 and aval_training:
             x = model_train.points_Constellation()
